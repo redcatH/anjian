@@ -49,15 +49,46 @@ public static class CodeSnippetBuilder
         return new CodeSnippetResult("鼠标双击代码", code, "移动到目标坐标后执行一次鼠标左键双击。");
     }
 
-    public static CodeSnippetResult BuildKeyboardTextInput(string text)
+    public static CodeSnippetResult BuildKeyboardTextInput(string text, KeyboardTextInputOptions? options = null)
     {
+        var actualOptions = options ?? new KeyboardTextInputOptions();
         var escapedText = EscapeString(text);
-        var code = $$"""
-            var keyboard = new Win32KeyboardService();
-            keyboard.TextInput("{{escapedText}}");
-            """;
+        string code;
 
-        return new CodeSnippetResult("键盘文本输入代码", code, "向当前焦点控件发送一段文本。");
+        if (actualOptions.Mode == KeyboardTextInputMode.SendInput)
+        {
+            code = $$"""
+                var keyboard = new Win32KeyboardService();
+                keyboard.TextInput(
+                    "{{escapedText}}",
+                    new KeyboardTextInputOptions(
+                        KeyboardTextInputMode.SendInput,
+                        perCharacterDelayMs: {{actualOptions.PerCharacterDelayMs}}));
+                """;
+        }
+        else
+        {
+            code = $$"""
+                var keyboard = new Win32KeyboardService();
+                keyboard.TextInput(
+                    "{{escapedText}}",
+                    new KeyboardTextInputOptions(
+                        KeyboardTextInputMode.ClipboardPaste,
+                        restoreClipboard: {{ToBooleanLiteral(actualOptions.RestoreClipboard)}},
+                        pasteMode: KeyboardPasteMode.{{actualOptions.PasteMode}},
+                        clipboardSettleDelayMs: {{actualOptions.ClipboardSettleDelayMs}},
+                        pasteSettleDelayMs: {{actualOptions.PasteSettleDelayMs}}));
+                """;
+        }
+
+        var title = actualOptions.Mode == KeyboardTextInputMode.ClipboardPaste
+            ? "剪贴板输入代码"
+            : "键盘文本输入代码";
+        var description = actualOptions.Mode == KeyboardTextInputMode.ClipboardPaste
+            ? "通过剪贴板和粘贴动作发送整段文本，适合中文和远程桌面。"
+            : "向当前焦点控件逐字发送文本。";
+
+        return new CodeSnippetResult(title, code, description);
     }
 
     public static CodeSnippetResult BuildKeyboardKeyPress(Keys key)

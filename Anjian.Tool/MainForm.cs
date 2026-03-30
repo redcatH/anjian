@@ -25,6 +25,7 @@ public sealed partial class MainForm : Form
     public MainForm()
     {
         InitializeComponent();
+        InitializeKeyboardTextModes();
 
         _cursorTimer = new Timer { Interval = 150 };
         _cursorTimer.Tick += (_, _) => UpdateLiveCursorPosition();
@@ -61,6 +62,14 @@ public sealed partial class MainForm : Form
         }
 
         base.WndProc(ref m);
+    }
+
+    private void InitializeKeyboardTextModes()
+    {
+        cboKeyboardTextMode.Items.Clear();
+        cboKeyboardTextMode.Items.Add("SendInput 模式");
+        cboKeyboardTextMode.Items.Add("剪贴板输入模式");
+        cboKeyboardTextMode.SelectedIndex = 0;
     }
 
     private void CaptureCurrentPosition()
@@ -161,9 +170,38 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        _keyboardService.TextInput(text);
-        SetSnippet(CodeSnippetBuilder.BuildKeyboardTextInput(text));
-        UpdateStatus("已发送文本输入，并生成 C# 代码。");
+        try
+        {
+            var options = GetKeyboardTextInputOptions();
+            _keyboardService.TextInput(text, options);
+            SetSnippet(CodeSnippetBuilder.BuildKeyboardTextInput(text, options));
+
+            if (options.Mode == KeyboardTextInputMode.SendInput)
+            {
+                UpdateStatus($"已发送文本，模式：SendInput 模式，长度：{text.Length}，逐字延时：{options.PerCharacterDelayMs}ms。");
+            }
+            else
+            {
+                UpdateStatus($"已发送文本，模式：剪贴板输入模式，长度：{text.Length}。");
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"文本发送失败，原因：{ex.Message}");
+            MessageBox.Show(this, ex.Message, "文本发送失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private KeyboardTextInputOptions GetKeyboardTextInputOptions()
+    {
+        if (!int.TryParse(txtPerCharacterDelay.Text, out var perCharacterDelayMs) || perCharacterDelayMs < 0)
+        {
+            throw new InvalidOperationException("逐字延时必须是大于或等于 0 的整数。");
+        }
+
+        return cboKeyboardTextMode.SelectedIndex == 1
+            ? new KeyboardTextInputOptions(KeyboardTextInputMode.ClipboardPaste)
+            : new KeyboardTextInputOptions(KeyboardTextInputMode.SendInput, PerCharacterDelayMs: perCharacterDelayMs);
     }
 
     private void SendKeyboardKeyAndGenerate(Keys key)
@@ -188,9 +226,7 @@ public sealed partial class MainForm : Form
 
     private bool TryParseHotKeyText(string input, out Keys[] keys)
     {
-        var tokens = input
-            .Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
+        var tokens = input.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (tokens.Length == 0)
         {
             keys = Array.Empty<Keys>();
@@ -328,25 +364,15 @@ public sealed partial class MainForm : Form
     }
 
     private void btnCapturePoint_Click(object? sender, EventArgs e) => CaptureCurrentPosition();
-
     private void btnCopyPoint_Click(object? sender, EventArgs e) => CopyCurrentPoint();
-
     private void btnMoveMouse_Click(object? sender, EventArgs e) => MoveMouseAndGenerate();
-
     private void btnLeftClick_Click(object? sender, EventArgs e) => LeftClickMouseAndGenerate();
-
     private void btnRightClick_Click(object? sender, EventArgs e) => RightClickMouseAndGenerate();
-
     private void btnDoubleClick_Click(object? sender, EventArgs e) => DoubleClickMouseAndGenerate();
-
     private void btnSendKeyboardText_Click(object? sender, EventArgs e) => SendKeyboardTextAndGenerate();
-
     private void btnKeyboardEnter_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Enter);
-
     private void btnKeyboardTab_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Tab);
-
     private void btnKeyboardEsc_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Escape);
-
     private void btnSendHotKey_Click(object? sender, EventArgs e) => SendKeyboardHotKeyAndGenerate();
 
     private void btnOpenImageMatch_Click(object? sender, EventArgs e)

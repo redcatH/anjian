@@ -45,8 +45,12 @@ public sealed partial class MainForm
     private Button btnOpenAmountOcr = null!;
     private GroupBox grpKeyboardTools = null!;
     private TableLayoutPanel keyboardToolLayout = null!;
+    private Label lblKeyboardModeTitle = null!;
+    private ComboBox cboKeyboardTextMode = null!;
     private Label lblKeyboardTextTitle = null!;
     private TextBox txtKeyboardText = null!;
+    private Label lblPerCharacterDelayTitle = null!;
+    private TextBox txtPerCharacterDelay = null!;
     private Button btnSendKeyboardText = null!;
     private TableLayoutPanel keyboardQuickKeyLayout = null!;
     private Button btnKeyboardEnter = null!;
@@ -107,8 +111,12 @@ public sealed partial class MainForm
         btnOpenImageMatch = new Button();
         grpKeyboardTools = new GroupBox();
         keyboardToolLayout = new TableLayoutPanel();
+        lblKeyboardModeTitle = new Label();
+        cboKeyboardTextMode = new ComboBox();
         lblKeyboardTextTitle = new Label();
         txtKeyboardText = new TextBox();
+        lblPerCharacterDelayTitle = new Label();
+        txtPerCharacterDelay = new TextBox();
         btnSendKeyboardText = new Button();
         keyboardQuickKeyLayout = new TableLayoutPanel();
         btnKeyboardEnter = new Button();
@@ -571,7 +579,7 @@ public sealed partial class MainForm
         centerStack.Name = "centerStack";
         centerStack.RowCount = 4;
         centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 156F));
-        centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 294F));
+        centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 368F));
         centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 174F));
         centerStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         centerStack.Size = new Size(280, 713);
@@ -622,7 +630,7 @@ public sealed partial class MainForm
         grpKeyboardTools.Margin = new Padding(0, 10, 0, 0);
         grpKeyboardTools.Name = "grpKeyboardTools";
         grpKeyboardTools.Padding = new Padding(10);
-        grpKeyboardTools.Size = new Size(280, 284);
+        grpKeyboardTools.Size = new Size(280, 358);
         grpKeyboardTools.TabIndex = 1;
         grpKeyboardTools.TabStop = false;
         grpKeyboardTools.Text = "键盘动作工具";
@@ -632,52 +640,97 @@ public sealed partial class MainForm
         keyboardToolLayout.ColumnCount = 2;
         keyboardToolLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
         keyboardToolLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        keyboardToolLayout.Controls.Add(lblKeyboardTextTitle, 0, 0);
-        keyboardToolLayout.Controls.Add(txtKeyboardText, 1, 0);
-        keyboardToolLayout.Controls.Add(btnSendKeyboardText, 1, 1);
-        keyboardToolLayout.Controls.Add(keyboardQuickKeyLayout, 1, 2);
-        keyboardToolLayout.Controls.Add(lblHotKeyTitle, 0, 3);
-        keyboardToolLayout.Controls.Add(txtHotKey, 1, 3);
-        keyboardToolLayout.Controls.Add(btnSendHotKey, 1, 4);
-        keyboardToolLayout.Controls.Add(lblKeyboardHint, 1, 5);
+        keyboardToolLayout.Controls.Add(lblKeyboardModeTitle, 0, 0);
+        keyboardToolLayout.Controls.Add(cboKeyboardTextMode, 1, 0);
+        keyboardToolLayout.Controls.Add(lblKeyboardTextTitle, 0, 1);
+        keyboardToolLayout.Controls.Add(txtKeyboardText, 1, 1);
+        keyboardToolLayout.Controls.Add(lblPerCharacterDelayTitle, 0, 2);
+        keyboardToolLayout.Controls.Add(txtPerCharacterDelay, 1, 2);
+        keyboardToolLayout.Controls.Add(btnSendKeyboardText, 1, 3);
+        keyboardToolLayout.Controls.Add(keyboardQuickKeyLayout, 1, 4);
+        keyboardToolLayout.Controls.Add(lblHotKeyTitle, 0, 5);
+        keyboardToolLayout.Controls.Add(txtHotKey, 1, 5);
+        keyboardToolLayout.Controls.Add(btnSendHotKey, 1, 6);
+        keyboardToolLayout.Controls.Add(lblKeyboardHint, 1, 7);
         keyboardToolLayout.Dock = DockStyle.Fill;
         keyboardToolLayout.Location = new Point(10, 26);
         keyboardToolLayout.Name = "keyboardToolLayout";
-        keyboardToolLayout.RowCount = 6;
+        keyboardToolLayout.RowCount = 8;
+        keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
         keyboardToolLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        keyboardToolLayout.Size = new Size(260, 248);
+        keyboardToolLayout.Size = new Size(260, 322);
         keyboardToolLayout.TabIndex = 0;
+        // 
+        // lblKeyboardModeTitle
+        // 
+        lblKeyboardModeTitle.Dock = DockStyle.Fill;
+        lblKeyboardModeTitle.Location = new Point(3, 0);
+        lblKeyboardModeTitle.Name = "lblKeyboardModeTitle";
+        lblKeyboardModeTitle.Size = new Size(68, 34);
+        lblKeyboardModeTitle.TabIndex = 0;
+        lblKeyboardModeTitle.Text = "文本模式";
+        lblKeyboardModeTitle.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // cboKeyboardTextMode
+        // 
+        cboKeyboardTextMode.Dock = DockStyle.Fill;
+        cboKeyboardTextMode.DropDownStyle = ComboBoxStyle.DropDownList;
+        cboKeyboardTextMode.FormattingEnabled = true;
+        cboKeyboardTextMode.Location = new Point(77, 3);
+        cboKeyboardTextMode.Name = "cboKeyboardTextMode";
+        cboKeyboardTextMode.Size = new Size(180, 25);
+        cboKeyboardTextMode.TabIndex = 1;
         // 
         // lblKeyboardTextTitle
         // 
         lblKeyboardTextTitle.Dock = DockStyle.Fill;
-        lblKeyboardTextTitle.Location = new Point(3, 0);
+        lblKeyboardTextTitle.Location = new Point(3, 34);
         lblKeyboardTextTitle.Name = "lblKeyboardTextTitle";
         lblKeyboardTextTitle.Size = new Size(68, 34);
-        lblKeyboardTextTitle.TabIndex = 0;
+        lblKeyboardTextTitle.TabIndex = 2;
         lblKeyboardTextTitle.Text = "输入文本";
         lblKeyboardTextTitle.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtKeyboardText
         // 
         txtKeyboardText.Dock = DockStyle.Fill;
-        txtKeyboardText.Location = new Point(77, 3);
+        txtKeyboardText.Location = new Point(77, 37);
         txtKeyboardText.Name = "txtKeyboardText";
         txtKeyboardText.Size = new Size(180, 23);
-        txtKeyboardText.TabIndex = 1;
+        txtKeyboardText.TabIndex = 3;
+        // 
+        // lblPerCharacterDelayTitle
+        // 
+        lblPerCharacterDelayTitle.Dock = DockStyle.Fill;
+        lblPerCharacterDelayTitle.Location = new Point(3, 68);
+        lblPerCharacterDelayTitle.Name = "lblPerCharacterDelayTitle";
+        lblPerCharacterDelayTitle.Size = new Size(68, 34);
+        lblPerCharacterDelayTitle.TabIndex = 4;
+        lblPerCharacterDelayTitle.Text = "逐字延时";
+        lblPerCharacterDelayTitle.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // txtPerCharacterDelay
+        // 
+        txtPerCharacterDelay.Dock = DockStyle.Fill;
+        txtPerCharacterDelay.Location = new Point(77, 71);
+        txtPerCharacterDelay.Name = "txtPerCharacterDelay";
+        txtPerCharacterDelay.Size = new Size(180, 23);
+        txtPerCharacterDelay.TabIndex = 5;
+        txtPerCharacterDelay.Text = "50";
         // 
         // btnSendKeyboardText
         // 
         btnSendKeyboardText.Dock = DockStyle.Fill;
-        btnSendKeyboardText.Location = new Point(77, 37);
+        btnSendKeyboardText.Location = new Point(77, 105);
         btnSendKeyboardText.Name = "btnSendKeyboardText";
         btnSendKeyboardText.Size = new Size(180, 34);
-        btnSendKeyboardText.TabIndex = 2;
+        btnSendKeyboardText.TabIndex = 6;
         btnSendKeyboardText.Text = "发送文本 / 生成代码";
         btnSendKeyboardText.UseVisualStyleBackColor = true;
         btnSendKeyboardText.Click += btnSendKeyboardText_Click;
@@ -692,13 +745,13 @@ public sealed partial class MainForm
         keyboardQuickKeyLayout.Controls.Add(btnKeyboardTab, 1, 0);
         keyboardQuickKeyLayout.Controls.Add(btnKeyboardEsc, 2, 0);
         keyboardQuickKeyLayout.Dock = DockStyle.Fill;
-        keyboardQuickKeyLayout.Location = new Point(74, 74);
+        keyboardQuickKeyLayout.Location = new Point(74, 142);
         keyboardQuickKeyLayout.Margin = new Padding(0);
         keyboardQuickKeyLayout.Name = "keyboardQuickKeyLayout";
         keyboardQuickKeyLayout.RowCount = 1;
         keyboardQuickKeyLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         keyboardQuickKeyLayout.Size = new Size(186, 40);
-        keyboardQuickKeyLayout.TabIndex = 3;
+        keyboardQuickKeyLayout.TabIndex = 7;
         // 
         // btnKeyboardEnter
         // 
@@ -736,29 +789,29 @@ public sealed partial class MainForm
         // lblHotKeyTitle
         // 
         lblHotKeyTitle.Dock = DockStyle.Fill;
-        lblHotKeyTitle.Location = new Point(3, 114);
+        lblHotKeyTitle.Location = new Point(3, 182);
         lblHotKeyTitle.Name = "lblHotKeyTitle";
         lblHotKeyTitle.Size = new Size(68, 34);
-        lblHotKeyTitle.TabIndex = 4;
+        lblHotKeyTitle.TabIndex = 8;
         lblHotKeyTitle.Text = "组合键";
         lblHotKeyTitle.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtHotKey
         // 
         txtHotKey.Dock = DockStyle.Fill;
-        txtHotKey.Location = new Point(77, 117);
+        txtHotKey.Location = new Point(77, 185);
         txtHotKey.Name = "txtHotKey";
         txtHotKey.Size = new Size(180, 23);
-        txtHotKey.TabIndex = 5;
+        txtHotKey.TabIndex = 9;
         txtHotKey.Text = "Ctrl+V";
         // 
         // btnSendHotKey
         // 
         btnSendHotKey.Dock = DockStyle.Fill;
-        btnSendHotKey.Location = new Point(77, 151);
+        btnSendHotKey.Location = new Point(77, 219);
         btnSendHotKey.Name = "btnSendHotKey";
         btnSendHotKey.Size = new Size(180, 34);
-        btnSendHotKey.TabIndex = 6;
+        btnSendHotKey.TabIndex = 10;
         btnSendHotKey.Text = "发送组合键 / 生成代码";
         btnSendHotKey.UseVisualStyleBackColor = true;
         btnSendHotKey.Click += btnSendHotKey_Click;
@@ -767,17 +820,17 @@ public sealed partial class MainForm
         // 
         lblKeyboardHint.Dock = DockStyle.Fill;
         lblKeyboardHint.ForeColor = Color.DimGray;
-        lblKeyboardHint.Location = new Point(77, 188);
+        lblKeyboardHint.Location = new Point(77, 256);
         lblKeyboardHint.Name = "lblKeyboardHint";
-        lblKeyboardHint.Size = new Size(180, 60);
-        lblKeyboardHint.TabIndex = 7;
-        lblKeyboardHint.Text = "支持文本输入、回车、Tab、Esc 和组合键，例如 Ctrl+S、Ctrl+Shift+A。";
+        lblKeyboardHint.Size = new Size(180, 66);
+        lblKeyboardHint.TabIndex = 11;
+        lblKeyboardHint.Text = "默认保留 SendInput 模式。逐字延时只作用于 SendInput，输入中文或远程桌面内容时可切到剪贴板输入模式。";
         // 
         // grpGuide
         // 
         grpGuide.Controls.Add(lblGuide);
         grpGuide.Dock = DockStyle.Fill;
-        grpGuide.Location = new Point(0, 460);
+        grpGuide.Location = new Point(0, 500);
         grpGuide.Margin = new Padding(0, 10, 0, 0);
         grpGuide.Name = "grpGuide";
         grpGuide.Padding = new Padding(10);
