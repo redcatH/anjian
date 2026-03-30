@@ -12,6 +12,8 @@ public sealed class Win32MouseService : IMouseService
     private const uint MouseeventfMove = 0x0001;
     private const uint MouseeventfLeftDown = 0x0002;
     private const uint MouseeventfLeftUp = 0x0004;
+    private const uint MouseeventfRightDown = 0x0008;
+    private const uint MouseeventfRightUp = 0x0010;
     private const uint MouseeventfAbsolute = 0x8000;
     private const uint MouseeventfVirtualDesk = 0x4000;
 
@@ -25,6 +27,13 @@ public sealed class Win32MouseService : IMouseService
         MoveTo(x, y);
         SendMouseInput(x, y, MouseeventfLeftDown | MouseeventfAbsolute | MouseeventfVirtualDesk);
         SendMouseInput(x, y, MouseeventfLeftUp | MouseeventfAbsolute | MouseeventfVirtualDesk);
+    }
+
+    public void RightClick(int x, int y)
+    {
+        MoveTo(x, y);
+        SendMouseInput(x, y, MouseeventfRightDown | MouseeventfAbsolute | MouseeventfVirtualDesk);
+        SendMouseInput(x, y, MouseeventfRightUp | MouseeventfAbsolute | MouseeventfVirtualDesk);
     }
 
     public void LeftDoubleClick(int x, int y, int intervalMilliseconds = 80)

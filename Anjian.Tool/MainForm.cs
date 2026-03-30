@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -18,6 +19,7 @@ public sealed partial class MainForm : Form
 
     private readonly Timer _cursorTimer;
     private readonly IMouseService _mouseService = new Win32MouseService();
+    private readonly IKeyboardService _keyboardService = new Win32KeyboardService();
     private readonly List<Point> _capturedPoints = new();
 
     public MainForm()
@@ -108,7 +110,7 @@ public sealed partial class MainForm : Form
         UpdateStatus("已执行鼠标移动，并生成 C# 代码。");
     }
 
-    private void ClickMouseAndGenerate()
+    private void LeftClickMouseAndGenerate()
     {
         if (!TryGetCurrentPoint(out var point))
         {
@@ -117,7 +119,19 @@ public sealed partial class MainForm : Form
 
         _mouseService.LeftClick(point.X, point.Y);
         SetSnippet(CodeSnippetBuilder.BuildMouseClick(point.X, point.Y));
-        UpdateStatus("已执行鼠标单击，并生成 C# 代码。");
+        UpdateStatus("已执行鼠标左键，并生成 C# 代码。");
+    }
+
+    private void RightClickMouseAndGenerate()
+    {
+        if (!TryGetCurrentPoint(out var point))
+        {
+            return;
+        }
+
+        _mouseService.RightClick(point.X, point.Y);
+        SetSnippet(CodeSnippetBuilder.BuildMouseRightClick(point.X, point.Y));
+        UpdateStatus("已执行鼠标右键，并生成 C# 代码。");
     }
 
     private void DoubleClickMouseAndGenerate()
@@ -136,6 +150,119 @@ public sealed partial class MainForm : Form
         _mouseService.LeftDoubleClick(point.X, point.Y, interval);
         SetSnippet(CodeSnippetBuilder.BuildMouseDoubleClick(point.X, point.Y, interval));
         UpdateStatus("已执行鼠标双击，并生成 C# 代码。");
+    }
+
+    private void SendKeyboardTextAndGenerate()
+    {
+        var text = txtKeyboardText.Text;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            MessageBox.Show(this, "请输入要发送的文本。", "缺少文本", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _keyboardService.TextInput(text);
+        SetSnippet(CodeSnippetBuilder.BuildKeyboardTextInput(text));
+        UpdateStatus("已发送文本输入，并生成 C# 代码。");
+    }
+
+    private void SendKeyboardKeyAndGenerate(Keys key)
+    {
+        _keyboardService.KeyPress(key);
+        SetSnippet(CodeSnippetBuilder.BuildKeyboardKeyPress(key));
+        UpdateStatus($"已发送按键 {key}，并生成 C# 代码。");
+    }
+
+    private void SendKeyboardHotKeyAndGenerate()
+    {
+        if (!TryParseHotKeyText(txtHotKey.Text, out var keys))
+        {
+            MessageBox.Show(this, "组合键格式无效，例如 Ctrl+V、Ctrl+Shift+A、Alt+F4。", "输入错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _keyboardService.HotKey(keys);
+        SetSnippet(CodeSnippetBuilder.BuildKeyboardHotKey(keys));
+        UpdateStatus($"已发送组合键：{string.Join("+", keys.Select(k => k.ToString()))}");
+    }
+
+    private bool TryParseHotKeyText(string input, out Keys[] keys)
+    {
+        var tokens = input
+            .Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (tokens.Length == 0)
+        {
+            keys = Array.Empty<Keys>();
+            return false;
+        }
+
+        var parsedKeys = new List<Keys>();
+        foreach (var token in tokens)
+        {
+            if (!TryParseKeyToken(token, out var key))
+            {
+                keys = Array.Empty<Keys>();
+                return false;
+            }
+
+            parsedKeys.Add(key);
+        }
+
+        keys = parsedKeys.ToArray();
+        return true;
+    }
+
+    private static bool TryParseKeyToken(string token, out Keys key)
+    {
+        var normalized = token.Trim().ToUpperInvariant();
+        switch (normalized)
+        {
+            case "CTRL":
+            case "CONTROL":
+                key = Keys.ControlKey;
+                return true;
+            case "ALT":
+                key = Keys.Menu;
+                return true;
+            case "SHIFT":
+                key = Keys.ShiftKey;
+                return true;
+            case "ENTER":
+            case "RETURN":
+                key = Keys.Enter;
+                return true;
+            case "ESC":
+                key = Keys.Escape;
+                return true;
+            case "TAB":
+                key = Keys.Tab;
+                return true;
+            case "SPACE":
+                key = Keys.Space;
+                return true;
+            case "DEL":
+            case "DELETE":
+                key = Keys.Delete;
+                return true;
+            case "BACKSPACE":
+                key = Keys.Back;
+                return true;
+        }
+
+        if (normalized.Length == 1 && normalized[0] >= 'A' && normalized[0] <= 'Z')
+        {
+            key = Keys.A + (normalized[0] - 'A');
+            return true;
+        }
+
+        if (normalized.Length == 1 && normalized[0] >= '0' && normalized[0] <= '9')
+        {
+            key = Keys.D0 + (normalized[0] - '0');
+            return true;
+        }
+
+        return Enum.TryParse(token, true, out key);
     }
 
     private bool TryGetCurrentPoint(out Point point)
@@ -206,9 +333,21 @@ public sealed partial class MainForm : Form
 
     private void btnMoveMouse_Click(object? sender, EventArgs e) => MoveMouseAndGenerate();
 
-    private void btnLeftClick_Click(object? sender, EventArgs e) => ClickMouseAndGenerate();
+    private void btnLeftClick_Click(object? sender, EventArgs e) => LeftClickMouseAndGenerate();
+
+    private void btnRightClick_Click(object? sender, EventArgs e) => RightClickMouseAndGenerate();
 
     private void btnDoubleClick_Click(object? sender, EventArgs e) => DoubleClickMouseAndGenerate();
+
+    private void btnSendKeyboardText_Click(object? sender, EventArgs e) => SendKeyboardTextAndGenerate();
+
+    private void btnKeyboardEnter_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Enter);
+
+    private void btnKeyboardTab_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Tab);
+
+    private void btnKeyboardEsc_Click(object? sender, EventArgs e) => SendKeyboardKeyAndGenerate(Keys.Escape);
+
+    private void btnSendHotKey_Click(object? sender, EventArgs e) => SendKeyboardHotKeyAndGenerate();
 
     private void btnOpenImageMatch_Click(object? sender, EventArgs e)
     {

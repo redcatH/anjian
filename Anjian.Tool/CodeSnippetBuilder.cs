@@ -1,6 +1,9 @@
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace Anjian;
 
@@ -23,7 +26,17 @@ public static class CodeSnippetBuilder
             mouse.LeftClick({{x}}, {{y}});
             """;
 
-        return new CodeSnippetResult("鼠标单击代码", code, "移动到目标坐标后执行一次左键单击。");
+        return new CodeSnippetResult("鼠标左键代码", code, "移动到目标坐标后执行一次鼠标左键单击。");
+    }
+
+    public static CodeSnippetResult BuildMouseRightClick(int x, int y)
+    {
+        var code = $$"""
+            var mouse = new Win32MouseService();
+            mouse.RightClick({{x}}, {{y}});
+            """;
+
+        return new CodeSnippetResult("鼠标右键代码", code, "移动到目标坐标后执行一次鼠标右键单击。");
     }
 
     public static CodeSnippetResult BuildMouseDoubleClick(int x, int y, int intervalMilliseconds = 80)
@@ -33,7 +46,40 @@ public static class CodeSnippetBuilder
             mouse.LeftDoubleClick({{x}}, {{y}}, {{intervalMilliseconds}});
             """;
 
-        return new CodeSnippetResult("鼠标双击代码", code, "移动到目标坐标后执行一次左键双击。");
+        return new CodeSnippetResult("鼠标双击代码", code, "移动到目标坐标后执行一次鼠标左键双击。");
+    }
+
+    public static CodeSnippetResult BuildKeyboardTextInput(string text)
+    {
+        var escapedText = EscapeString(text);
+        var code = $$"""
+            var keyboard = new Win32KeyboardService();
+            keyboard.TextInput("{{escapedText}}");
+            """;
+
+        return new CodeSnippetResult("键盘文本输入代码", code, "向当前焦点控件发送一段文本。");
+    }
+
+    public static CodeSnippetResult BuildKeyboardKeyPress(Keys key)
+    {
+        var code = $$"""
+            var keyboard = new Win32KeyboardService();
+            keyboard.KeyPress(Keys.{{key}});
+            """;
+
+        return new CodeSnippetResult("键盘按键代码", code, $"发送一次 {key} 按键。");
+    }
+
+    public static CodeSnippetResult BuildKeyboardHotKey(IEnumerable<Keys> keys)
+    {
+        var keyList = keys.ToArray();
+        var joinedKeys = string.Join(", ", keyList.Select(key => $"Keys.{key}"));
+        var code = $$"""
+            var keyboard = new Win32KeyboardService();
+            keyboard.HotKey({{joinedKeys}});
+            """;
+
+        return new CodeSnippetResult("键盘组合键代码", code, $"发送组合键：{string.Join("+", keyList)}");
     }
 
     public static CodeSnippetResult BuildImageMatch(
@@ -95,6 +141,15 @@ public static class CodeSnippetBuilder
     private static string EscapePath(string path)
     {
         return Path.GetFullPath(path).Replace("\"", "\"\"");
+    }
+
+    private static string EscapeString(string value)
+    {
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n");
     }
 
     private static string ToBooleanLiteral(bool value)

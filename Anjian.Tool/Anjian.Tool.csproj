@@ -9,8 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Tesseract" Version="5.2.0" />
-    <PackageReference Include="Tesseract.Drawing" Version="5.2.0" />
+    <ProjectReference Include="..\Anjian.Automation\Anjian.Automation.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,7 +34,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="tessdata\\eng.traineddata">
+    <EmbeddedResource Update="MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="ImageMatchTestForm.resx">
+      <DependentUpon>ImageMatchTestForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="AmountOcrTestForm.resx">
+      <DependentUpon>AmountOcrTestForm.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\tessdata\eng.traineddata" Link="tessdata\eng.traineddata">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
