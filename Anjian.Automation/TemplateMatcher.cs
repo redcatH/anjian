@@ -2,12 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Anjian;
 
 public sealed class TemplateMatcher : IImageMatcher
 {
+    private const int SamplePointCount = 12;
+
     public ImageMatchResult Find(Bitmap source, Bitmap template, ImageMatchOptions options)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -36,13 +40,22 @@ public sealed class TemplateMatcher : IImageMatcher
             return CreateFailure("模板图片大于搜索区域。");
         }
 
+        using var normalizedSource = ConvertToArgb32(source);
+        using var normalizedTemplate = ConvertToArgb32(template);
+
         var watch = Stopwatch.StartNew();
+
+        var sourcePixels = PixelBuffer.Create(normalizedSource, options.UseGrayscale);
+        var templatePixels = PixelBuffer.Create(normalizedTemplate, options.UseGrayscale);
+        var maxAllowedDifference = CalculateMaxAllowedDifference(templatePixels, options.UseGrayscale, options.Threshold);
+        var samplePoints = BuildSamplePoints(templatePixels.Width, templatePixels.Height);
+
         var hits = new List<ImageMatchHit>();
         var bestScore = double.MinValue;
         Point? bestLocation = null;
 
-        var maxX = options.SearchRegion.Right - template.Width;
-        var maxY = options.SearchRegion.Bottom - template.Height;
+        var maxX = options.SearchRegion.Right - templatePixels.Width;
+        var maxY = options.SearchRegion.Bottom - templatePixels.Height;
 
         var xPositions = BuildAxis(options.SearchRegion.Left, maxX, options.Step);
         var yPositions = BuildAxis(options.SearchRegion.Top, maxY, options.Step);
@@ -51,14 +64,25 @@ public sealed class TemplateMatcher : IImageMatcher
         var orderedXPositions = columnFirst ? OrderAxis(xPositions, options.ScanDirection) : xPositions;
         var orderedYPositions = columnFirst ? yPositions : OrderAxis(yPositions, options.ScanDirection);
 
-        // 通过扫描方向调整遍历顺序；在“只找第一个”模式下会直接影响提前命中的速度。
         if (columnFirst)
         {
             foreach (var x in orderedXPositions)
             {
                 foreach (var y in orderedYPositions)
                 {
-                    if (TryHandleCandidate(source, template, options, hits, x, y, ref bestScore, ref bestLocation, watch, out var successResult))
+                    if (TryHandleCandidate(
+                            sourcePixels,
+                            templatePixels,
+                            options,
+                            samplePoints,
+                            maxAllowedDifference,
+                            hits,
+                            x,
+                            y,
+                            ref bestScore,
+                            ref bestLocation,
+                            watch,
+                            out var successResult))
                     {
                         return successResult;
                     }
@@ -71,7 +95,19 @@ public sealed class TemplateMatcher : IImageMatcher
             {
                 foreach (var x in orderedXPositions)
                 {
-                    if (TryHandleCandidate(source, template, options, hits, x, y, ref bestScore, ref bestLocation, watch, out var successResult))
+                    if (TryHandleCandidate(
+                            sourcePixels,
+                            templatePixels,
+                            options,
+                            samplePoints,
+                            maxAllowedDifference,
+                            hits,
+                            x,
+                            y,
+                            ref bestScore,
+                            ref bestLocation,
+                            watch,
+                            out var successResult))
                     {
                         return successResult;
                     }
@@ -108,9 +144,11 @@ public sealed class TemplateMatcher : IImageMatcher
     }
 
     private static bool TryHandleCandidate(
-        Bitmap source,
-        Bitmap template,
+        PixelBuffer source,
+        PixelBuffer template,
         ImageMatchOptions options,
+        IReadOnlyList<SamplePoint> samplePoints,
+        double maxAllowedDifference,
         ICollection<ImageMatchHit> hits,
         int x,
         int y,
@@ -121,7 +159,17 @@ public sealed class TemplateMatcher : IImageMatcher
     {
         successResult = default!;
 
-        var score = CalculateScore(source, template, x, y, options.UseGrayscale);
+        if (!PassesSampleFilter(source, template, x, y, samplePoints, maxAllowedDifference))
+        {
+            return false;
+        }
+
+        var score = CalculateScore(source, template, x, y, maxAllowedDifference);
+        if (score < 0d)
+        {
+            return false;
+        }
+
         if (score > bestScore)
         {
             bestScore = score;
@@ -143,6 +191,155 @@ public sealed class TemplateMatcher : IImageMatcher
 
         AddIfDistinct(hits, hit, template.Size);
         return false;
+    }
+
+    private static bool PassesSampleFilter(
+        PixelBuffer source,
+        PixelBuffer template,
+        int startX,
+        int startY,
+        IReadOnlyList<SamplePoint> samplePoints,
+        double maxAllowedDifference)
+    {
+        if (samplePoints.Count == 0)
+        {
+            return true;
+        }
+
+        double sampledDifference = 0d;
+        foreach (var point in samplePoints)
+        {
+            sampledDifference += GetDifference(source, template, startX + point.X, startY + point.Y, point.X, point.Y);
+            if (sampledDifference > point.CutoffDifference * maxAllowedDifference)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static double CalculateScore(
+        PixelBuffer source,
+        PixelBuffer template,
+        int startX,
+        int startY,
+        double maxAllowedDifference)
+    {
+        double totalDifference = 0d;
+        for (var y = 0; y < template.Height; y++)
+        {
+            var sourceRowOffset = source.GetOffset(startX, startY + y);
+            var templateRowOffset = template.GetOffset(0, y);
+
+            if (template.IsGrayscale)
+            {
+                for (var x = 0; x < template.Width; x++)
+                {
+                    totalDifference += Math.Abs(source.Buffer[sourceRowOffset + x] - template.Buffer[templateRowOffset + x]);
+                    if (totalDifference > maxAllowedDifference)
+                    {
+                        return -1d;
+                    }
+                }
+            }
+            else
+            {
+                for (var x = 0; x < template.Width; x++)
+                {
+                    var sourceIndex = sourceRowOffset + x * 4;
+                    var templateIndex = templateRowOffset + x * 4;
+
+                    totalDifference +=
+                        Math.Abs(source.Buffer[sourceIndex] - template.Buffer[templateIndex]) +
+                        Math.Abs(source.Buffer[sourceIndex + 1] - template.Buffer[templateIndex + 1]) +
+                        Math.Abs(source.Buffer[sourceIndex + 2] - template.Buffer[templateIndex + 2]);
+
+                    if (totalDifference > maxAllowedDifference)
+                    {
+                        return -1d;
+                    }
+                }
+            }
+        }
+
+        var normalizedDifference = totalDifference / (template.PixelCount * template.ChannelDenominator);
+        return 1d - normalizedDifference;
+    }
+
+    private static double GetDifference(
+        PixelBuffer source,
+        PixelBuffer template,
+        int sourceX,
+        int sourceY,
+        int templateX,
+        int templateY)
+    {
+        var sourceOffset = source.GetOffset(sourceX, sourceY);
+        var templateOffset = template.GetOffset(templateX, templateY);
+
+        if (template.IsGrayscale)
+        {
+            return Math.Abs(source.Buffer[sourceOffset] - template.Buffer[templateOffset]);
+        }
+
+        return
+            Math.Abs(source.Buffer[sourceOffset] - template.Buffer[templateOffset]) +
+            Math.Abs(source.Buffer[sourceOffset + 1] - template.Buffer[templateOffset + 1]) +
+            Math.Abs(source.Buffer[sourceOffset + 2] - template.Buffer[templateOffset + 2]);
+    }
+
+    private static double CalculateMaxAllowedDifference(PixelBuffer template, bool useGrayscale, double threshold)
+    {
+        var normalizedThreshold = Math.Clamp(threshold, 0d, 1d);
+        return (1d - normalizedThreshold) * template.PixelCount * template.ChannelDenominator;
+    }
+
+    private static List<SamplePoint> BuildSamplePoints(int width, int height)
+    {
+        var points = new List<SamplePoint>();
+        var seen = new HashSet<(int X, int Y)>();
+
+        var gridSize = Math.Max(2, (int)Math.Ceiling(Math.Sqrt(SamplePointCount)));
+        var index = 0;
+        for (var gridY = 0; gridY < gridSize; gridY++)
+        {
+            for (var gridX = 0; gridX < gridSize; gridX++)
+            {
+                if (index >= SamplePointCount)
+                {
+                    break;
+                }
+
+                var x = width == 1 ? 0 : (int)Math.Round(gridX * (width - 1d) / Math.Max(1, gridSize - 1));
+                var y = height == 1 ? 0 : (int)Math.Round(gridY * (height - 1d) / Math.Max(1, gridSize - 1));
+                if (seen.Add((x, y)))
+                {
+                    index++;
+                    points.Add(new SamplePoint(x, y, index / (double)SamplePointCount));
+                }
+            }
+        }
+
+        if (seen.Add((width / 2, height / 2)))
+        {
+            points.Add(new SamplePoint(width / 2, height / 2, 1d));
+        }
+
+        return points;
+    }
+
+    private static Bitmap ConvertToArgb32(Bitmap source)
+    {
+        if (source.PixelFormat == PixelFormat.Format32bppArgb)
+        {
+            return (Bitmap)source.Clone();
+        }
+
+        var converted = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(converted);
+        graphics.DrawImage(source, new Rectangle(0, 0, converted.Width, converted.Height));
+        return converted;
     }
 
     private static List<int> BuildAxis(int start, int end, int step)
@@ -227,37 +424,6 @@ public sealed class TemplateMatcher : IImageMatcher
         return new ImageMatchResult(false, null, 0d, 0L, message, Array.Empty<ImageMatchHit>());
     }
 
-    private static double CalculateScore(Bitmap source, Bitmap template, int startX, int startY, bool useGrayscale)
-    {
-        double totalDifference = 0d;
-        var pixelCount = template.Width * template.Height;
-        var denominator = useGrayscale ? 255d : 255d * 3d;
-
-        for (var y = 0; y < template.Height; y++)
-        {
-            for (var x = 0; x < template.Width; x++)
-            {
-                var sourceColor = source.GetPixel(startX + x, startY + y);
-                var templateColor = template.GetPixel(x, y);
-
-                totalDifference += useGrayscale
-                    ? Math.Abs(ToGray(sourceColor) - ToGray(templateColor))
-                    : Math.Abs(sourceColor.R - templateColor.R) +
-                      Math.Abs(sourceColor.G - templateColor.G) +
-                      Math.Abs(sourceColor.B - templateColor.B);
-            }
-        }
-
-        // 将像素差异归一化到 0-1，再转成“越大越相似”的分数。
-        var normalizedDifference = totalDifference / (pixelCount * denominator);
-        return 1d - normalizedDifference;
-    }
-
-    private static int ToGray(Color color)
-    {
-        return (int)Math.Round(color.R * 0.299 + color.G * 0.587 + color.B * 0.114);
-    }
-
     private static string GetScanDirectionText(ImageScanDirection scanDirection)
     {
         return scanDirection switch
@@ -270,4 +436,79 @@ public sealed class TemplateMatcher : IImageMatcher
             _ => "从上到下"
         };
     }
+
+    private sealed class PixelBuffer
+    {
+        private PixelBuffer(byte[] buffer, int width, int height, int stride, bool isGrayscale)
+        {
+            Buffer = buffer;
+            Width = width;
+            Height = height;
+            Stride = stride;
+            IsGrayscale = isGrayscale;
+            ChannelDenominator = isGrayscale ? 255d : 255d * 3d;
+            Size = new Size(width, height);
+            PixelCount = width * height;
+        }
+
+        public byte[] Buffer { get; }
+
+        public int Width { get; }
+
+        public int Height { get; }
+
+        public int Stride { get; }
+
+        public bool IsGrayscale { get; }
+
+        public double ChannelDenominator { get; }
+
+        public int PixelCount { get; }
+
+        public Size Size { get; }
+
+        public int GetOffset(int x, int y)
+        {
+            return IsGrayscale ? y * Stride + x : y * Stride + x * 4;
+        }
+
+        public static PixelBuffer Create(Bitmap bitmap, bool grayscale)
+        {
+            var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            var data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                var raw = new byte[Math.Abs(data.Stride) * data.Height];
+                Marshal.Copy(data.Scan0, raw, 0, raw.Length);
+
+                if (!grayscale)
+                {
+                    return new PixelBuffer(raw, bitmap.Width, bitmap.Height, Math.Abs(data.Stride), false);
+                }
+
+                var gray = new byte[bitmap.Width * bitmap.Height];
+                var grayIndex = 0;
+                for (var y = 0; y < bitmap.Height; y++)
+                {
+                    var rowOffset = y * Math.Abs(data.Stride);
+                    for (var x = 0; x < bitmap.Width; x++)
+                    {
+                        var pixelOffset = rowOffset + x * 4;
+                        var blue = raw[pixelOffset];
+                        var green = raw[pixelOffset + 1];
+                        var red = raw[pixelOffset + 2];
+                        gray[grayIndex++] = (byte)Math.Round(red * 0.299 + green * 0.587 + blue * 0.114);
+                    }
+                }
+
+                return new PixelBuffer(gray, bitmap.Width, bitmap.Height, bitmap.Width, true);
+            }
+            finally
+            {
+                bitmap.UnlockBits(data);
+            }
+        }
+    }
+
+    private readonly record struct SamplePoint(int X, int Y, double CutoffDifference);
 }

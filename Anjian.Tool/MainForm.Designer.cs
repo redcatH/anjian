@@ -171,7 +171,7 @@ public sealed partial class MainForm
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
-        rootLayout.Size = new Size(1484, 901);
+        rootLayout.Size = new Size(1304, 901);
         rootLayout.TabIndex = 0;
         // 
         // headerPanel
@@ -184,7 +184,7 @@ public sealed partial class MainForm
         headerPanel.Margin = new Padding(0, 0, 0, 12);
         headerPanel.Name = "headerPanel";
         headerPanel.Padding = new Padding(18, 16, 18, 12);
-        headerPanel.Size = new Size(1452, 70);
+        headerPanel.Size = new Size(1272, 70);
         headerPanel.TabIndex = 0;
         // 
         // lblHeaderDescription
@@ -193,7 +193,7 @@ public sealed partial class MainForm
         lblHeaderDescription.ForeColor = Color.DimGray;
         lblHeaderDescription.Location = new Point(18, 46);
         lblHeaderDescription.Name = "lblHeaderDescription";
-        lblHeaderDescription.Size = new Size(1416, 24);
+        lblHeaderDescription.Size = new Size(1236, 24);
         lblHeaderDescription.TabIndex = 1;
         lblHeaderDescription.Text = "主页面负责坐标采集、鼠标动作调试和 C# 代码片段输出，专项参数请在测试窗口中完成调试。";
         // 
@@ -203,7 +203,7 @@ public sealed partial class MainForm
         lblHeaderTitle.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
         lblHeaderTitle.Location = new Point(18, 16);
         lblHeaderTitle.Name = "lblHeaderTitle";
-        lblHeaderTitle.Size = new Size(1416, 30);
+        lblHeaderTitle.Size = new Size(1236, 30);
         lblHeaderTitle.TabIndex = 0;
         lblHeaderTitle.Text = "C# 自动化工具台";
         // 
@@ -222,7 +222,7 @@ public sealed partial class MainForm
         workspaceLayout.Name = "workspaceLayout";
         workspaceLayout.RowCount = 1;
         workspaceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        workspaceLayout.Size = new Size(1452, 741);
+        workspaceLayout.Size = new Size(1272, 741);
         workspaceLayout.TabIndex = 1;
         // 
         // leftCard
@@ -805,7 +805,7 @@ public sealed partial class MainForm
         rightCard.Margin = new Padding(0);
         rightCard.Name = "rightCard";
         rightCard.Padding = new Padding(14);
-        rightCard.Size = new Size(772, 741);
+        rightCard.Size = new Size(592, 741);
         rightCard.TabIndex = 2;
         // 
         // rightStack
@@ -824,7 +824,7 @@ public sealed partial class MainForm
         rightStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
         rightStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         rightStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
-        rightStack.Size = new Size(744, 713);
+        rightStack.Size = new Size(564, 713);
         rightStack.TabIndex = 0;
         // 
         // lblSnippetTitle
@@ -834,7 +834,7 @@ public sealed partial class MainForm
         lblSnippetTitle.Location = new Point(0, 0);
         lblSnippetTitle.Margin = new Padding(0, 0, 0, 8);
         lblSnippetTitle.Name = "lblSnippetTitle";
-        lblSnippetTitle.Size = new Size(744, 22);
+        lblSnippetTitle.Size = new Size(564, 22);
         lblSnippetTitle.TabIndex = 0;
         lblSnippetTitle.Text = "当前代码片段";
         // 
@@ -851,7 +851,7 @@ public sealed partial class MainForm
         snippetActionLayout.Name = "snippetActionLayout";
         snippetActionLayout.RowCount = 1;
         snippetActionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        snippetActionLayout.Size = new Size(744, 48);
+        snippetActionLayout.Size = new Size(564, 48);
         snippetActionLayout.TabIndex = 1;
         // 
         // btnCopySnippet
@@ -859,7 +859,7 @@ public sealed partial class MainForm
         btnCopySnippet.Dock = DockStyle.Fill;
         btnCopySnippet.Location = new Point(3, 3);
         btnCopySnippet.Name = "btnCopySnippet";
-        btnCopySnippet.Size = new Size(366, 42);
+        btnCopySnippet.Size = new Size(276, 42);
         btnCopySnippet.TabIndex = 0;
         btnCopySnippet.Text = "复制代码";
         btnCopySnippet.UseVisualStyleBackColor = true;
@@ -868,9 +868,9 @@ public sealed partial class MainForm
         // btnClearSnippet
         // 
         btnClearSnippet.Dock = DockStyle.Fill;
-        btnClearSnippet.Location = new Point(375, 3);
+        btnClearSnippet.Location = new Point(285, 3);
         btnClearSnippet.Name = "btnClearSnippet";
-        btnClearSnippet.Size = new Size(366, 42);
+        btnClearSnippet.Size = new Size(276, 42);
         btnClearSnippet.TabIndex = 1;
         btnClearSnippet.Text = "清空代码";
         btnClearSnippet.UseVisualStyleBackColor = true;
@@ -887,7 +887,7 @@ public sealed partial class MainForm
         txtSnippet.Multiline = true;
         txtSnippet.Name = "txtSnippet";
         txtSnippet.ScrollBars = ScrollBars.Both;
-        txtSnippet.Size = new Size(744, 597);
+        txtSnippet.Size = new Size(564, 597);
         txtSnippet.TabIndex = 2;
         txtSnippet.WordWrap = false;
         // 
@@ -899,7 +899,7 @@ public sealed partial class MainForm
         lblSnippetHint.Location = new Point(0, 685);
         lblSnippetHint.Margin = new Padding(0);
         lblSnippetHint.Name = "lblSnippetHint";
-        lblSnippetHint.Size = new Size(744, 28);
+        lblSnippetHint.Size = new Size(564, 28);
         lblSnippetHint.TabIndex = 3;
         lblSnippetHint.Text = "这里展示的是可直接复制到用户 C# 项目中的调用代码。";
         // 
@@ -912,7 +912,7 @@ public sealed partial class MainForm
         statusPanel.Margin = new Padding(0, 12, 0, 0);
         statusPanel.Name = "statusPanel";
         statusPanel.Padding = new Padding(16, 8, 16, 8);
-        statusPanel.Size = new Size(1452, 36);
+        statusPanel.Size = new Size(1272, 36);
         statusPanel.TabIndex = 2;
         // 
         // lblStatus
@@ -921,7 +921,7 @@ public sealed partial class MainForm
         lblStatus.ForeColor = Color.DimGray;
         lblStatus.Location = new Point(16, 8);
         lblStatus.Name = "lblStatus";
-        lblStatus.Size = new Size(1420, 20);
+        lblStatus.Size = new Size(1240, 20);
         lblStatus.TabIndex = 0;
         lblStatus.Text = "就绪";
         // 
@@ -930,7 +930,7 @@ public sealed partial class MainForm
         AutoScaleDimensions = new SizeF(7F, 17F);
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = Color.FromArgb(245, 247, 250);
-        ClientSize = new Size(1484, 901);
+        ClientSize = new Size(1304, 901);
         Controls.Add(rootLayout);
         MinimumSize = new Size(1320, 820);
         Name = "MainForm";
