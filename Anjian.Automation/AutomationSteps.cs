@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -40,6 +41,8 @@ public sealed class LeftClickStep : IAutomationStep
 
     public void Execute(AutomationContext context)
     {
+        context.Mouse.MoveTo(X, Y);
+        
         context.Mouse.LeftClick(X, Y);
     }
 }
@@ -181,5 +184,39 @@ public sealed class DelegateStep : IAutomationStep
     {
         _ = context;
         _action();
+    }
+}
+
+public sealed class ConditionalStep : IAutomationStep
+{
+    private readonly Func<AutomationContext, bool> _predicate;
+    private readonly IReadOnlyList<IAutomationStep> _whenTrueSteps;
+    private readonly IReadOnlyList<IAutomationStep> _whenFalseSteps;
+
+    public ConditionalStep(
+        string name,
+        Func<AutomationContext, bool> predicate,
+        IReadOnlyList<IAutomationStep> whenTrueSteps,
+        IReadOnlyList<IAutomationStep>? whenFalseSteps = null)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "条件步骤" : name;
+        _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        _whenTrueSteps = whenTrueSteps ?? throw new ArgumentNullException(nameof(whenTrueSteps));
+        _whenFalseSteps = whenFalseSteps ?? Array.Empty<IAutomationStep>();
+    }
+
+    public string Name { get; }
+
+    public void Execute(AutomationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var branchSteps = _predicate(context) ? _whenTrueSteps : _whenFalseSteps;
+        if (branchSteps.Count == 0)
+        {
+            return;
+        }
+
+        var runner = new AutomationRunner();
+        runner.Run(branchSteps, context);
     }
 }
