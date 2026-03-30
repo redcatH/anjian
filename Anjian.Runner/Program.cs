@@ -149,7 +149,7 @@ internal static class Program
         var zhRegion = new Rectangle(2178, 5, 60, 800);
         var zhTemplatePath = @"D:\work\anjian\Anjian.Runner\最后.png";
         
-        var number = "m0001";
+        var number = "m0002";
         var steps = new IAutomationStep[]
         {
             //点击住院结算
@@ -228,7 +228,8 @@ internal static class Program
             
             new WaitStep("请确认所有勾选F3会点击联网结算，确认后按 F3 继续。"),
             new MouseMoveStep(2515, 831),
-            // new LeftClickStep(2515, 831)//暂时不开放点击
+            // new LeftClickStep(2515, 831)//TODO 暂时不开放点击
+            //TODO 图像识别出金额需要保存起来
             
             
             
@@ -248,16 +249,57 @@ internal static class Program
             new RightClickStep(2406, 243),
             new DelayStep(5000),
             new MouseMoveStep(2406 + 67, 243 + 134),
-            // new LeftClickStep(2406+67,243+134),
-            
+            // new LeftClickStep(2406+67,243+134),//TODO 点击新增记录
+            //TODO 新增条目后 需要先 选择左上角 手工录入本照护费
+            //TODO 本院编码输入 jjzh 回车, 显示居家照护
+            //TODO  然后输入 预结算记录的数字
+            //为了找到新增的条目，然后改变费用类型
             new DelegateStep("查找新增条目", () =>
             {
-                var result = FindImage(capture, matcher, zhTemplatePath,zhOptions);
-                if (result.Success)
+                var result = FindImage(
+                    capture,
+                    matcher,
+                    zhTemplatePath,
+                    zhOptions with { SearchRegion = zhRegion });
+
+                if (result.Success && result.Location is not null)
                 {
-                    mouse.MoveTo(result.Hits[0].Location.X, result.Hits[0].Location.Y);
+                    mouse.MoveTo(result.Location.Value.X +181, result.Location.Value.Y+30);
+                    mouse.LeftClick(result.Location.Value.X +181, result.Location.Value.Y+30);
+                    mouse.RightClick(result.Location.Value.X +181, result.Location.Value.Y+30);
+                    mouse.MoveTo(result.Location.Value.X +181+70, result.Location.Value.Y+30+13);
+                    mouse.LeftClick(result.Location.Value.X +181+70, result.Location.Value.Y+30+13);
+                    mouse.MoveTo(result.Location.Value.X +181+70, result.Location.Value.Y+30+13);
+                    //mouse.LeftClick(result.Location.Value.X +181+70+136, result.Location.Value.Y+30+13+80); //TODO 暂时不点击
                 }
-            })
+            }),
+            new WaitStep("F3 继续"),
+            
+            //点击住院结算
+            new MouseMoveStep(1942, 112),
+            new LeftClickStep(1942, 112),
+            new DelayStep(1000),
+
+            //取消预勾选
+            new ConditionalStep(
+                "如果没有勾选 预结算",
+                _ =>
+                {
+                    var t = HasImage(capture, matcher, YjsRegion, YjsTemplatePath);
+                    var c = t ? "勾选" : "未勾选";
+                    Console.WriteLine($"预结算:{c}");
+                    //如果没有勾选
+                    return t;
+                },
+                new IAutomationStep[]
+                {
+                    // 取消
+                    new MouseMoveStep(2403, 837),
+                    new LeftClickStep(2403, 837),
+                }),
+            //点击结算即可完成一个人的结算
+            new MouseMoveStep(2515, 831),
+            // new LeftClickStep(2515, 831)//TODO 暂时不开放点击
         };
 
         try
