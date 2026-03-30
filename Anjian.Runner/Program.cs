@@ -125,6 +125,30 @@ internal static class Program
         //     var screenPoint = new Point(result.Location!.Value.X + 2539, result.Location.Value.Y + 813);
         //     Console.WriteLine($"命中坐标: {screenPoint.X}, {screenPoint.Y}");
         // }
+        
+        
+        // 已包含搜索区域、模板路径、阈值、匹配模式和扫描方向。
+        // using var sourceBitmap = new ScreenCaptureService().Capture(new Rectangle(2178, 5, 60, 800));
+        // using var templateBitmap = new Bitmap(@"C:\Users\Administrator\Documents\ShareX\Screenshots\2026-03\mstsc_HrLGqbKqrN.png");
+        //
+        // var matcher = new TemplateMatcher();
+        var zhOptions = new ImageMatchOptions(
+            new Rectangle(0, 0, 60, 800),
+            0.90,
+            true,
+            1,
+            ImageMatchMode.First,
+            ImageScanDirection.BottomToTop);
+        //
+        // var result = matcher.Find(sourceBitmap, templateBitmap, matchOptions);
+        // if (result.Success)
+        // {
+        //     var screenPoint = new Point(result.Location!.Value.X + 2178, result.Location.Value.Y + 5);
+        //     Console.WriteLine($"命中坐标: {screenPoint.X}, {screenPoint.Y}");
+        // }
+        var zhRegion = new Rectangle(2178, 5, 60, 800);
+        var zhTemplatePath = @"D:\work\anjian\Anjian.Runner\最后.png";
+        
         var number = "m0001";
         var steps = new IAutomationStep[]
         {
@@ -225,6 +249,15 @@ internal static class Program
             new DelayStep(5000),
             new MouseMoveStep(2406 + 67, 243 + 134),
             // new LeftClickStep(2406+67,243+134),
+            
+            new DelegateStep("查找新增条目", () =>
+            {
+                var result = FindImage(capture, matcher, zhTemplatePath,zhOptions);
+                if (result.Success)
+                {
+                    mouse.MoveTo(result.Hits[0].Location.X, result.Hits[0].Location.Y);
+                }
+            })
         };
 
         try
