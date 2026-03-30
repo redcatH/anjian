@@ -33,6 +33,10 @@ public sealed class AutomationRunner
 
                 step.Execute(context);
             }
+            catch (SkipCurrentRunException)
+            {
+                throw;
+            }
             catch (AutomationStepExecutionException)
             {
                 throw;
