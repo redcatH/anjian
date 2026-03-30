@@ -98,7 +98,7 @@ public sealed class Win32KeyboardService : IKeyboardService
                 Keyboard = new KeyboardInput
                 {
                     WVk = 0,
-                    WScan = ch,
+                    WScan = (ushort)ch,
                     DwFlags = KeyeventfUnicode | (keyUp ? KeyeventfKeyUp : 0),
                     Time = 0,
                     DwExtraInfo = IntPtr.Zero
@@ -130,6 +130,12 @@ public sealed class Win32KeyboardService : IKeyboardService
     {
         [FieldOffset(0)]
         public KeyboardInput Keyboard;
+
+        [FieldOffset(0)]
+        public MouseInput Mouse;
+
+        [FieldOffset(0)]
+        public HardwareInput Hardware;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -140,6 +146,25 @@ public sealed class Win32KeyboardService : IKeyboardService
         public uint DwFlags;
         public uint Time;
         public IntPtr DwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int Dx;
+        public int Dy;
+        public uint MouseData;
+        public uint DwFlags;
+        public uint Time;
+        public IntPtr DwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HardwareInput
+    {
+        public uint UMsg;
+        public ushort WParamL;
+        public ushort WParamH;
     }
 
     [DllImport("user32.dll", SetLastError = true)]
