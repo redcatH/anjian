@@ -50,6 +50,7 @@ public sealed partial class TextOcrTestForm
     private Label lblElapsedValue = null!;
     private Label lblMessageValue = null!;
     private Button btnCaptureRegion = null!;
+    private Button btnPickRegion = null!;
     private Button btnExecuteOcr = null!;
     private Button btnGenerateSnippet = null!;
     private Button btnCopySnippet = null!;
@@ -77,6 +78,7 @@ public sealed partial class TextOcrTestForm
         lblThreshold = new Label();
         txtThreshold = new TextBox();
         actionLayout = new TableLayoutPanel();
+        btnPickRegion = new Button();
         btnCaptureRegion = new Button();
         btnExecuteOcr = new Button();
         btnGenerateSnippet = new Button();
@@ -154,7 +156,7 @@ public sealed partial class TextOcrTestForm
         leftPanel.Location = new Point(15, 15);
         leftPanel.Name = "leftPanel";
         leftPanel.RowCount = 4;
-        leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 180F));
+        leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 220F));
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 200F));
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 176F));
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -168,7 +170,7 @@ public sealed partial class TextOcrTestForm
         grpRegion.Location = new Point(3, 3);
         grpRegion.Name = "grpRegion";
         grpRegion.Padding = new Padding(10);
-        grpRegion.Size = new Size(318, 174);
+        grpRegion.Size = new Size(318, 214);
         grpRegion.TabIndex = 0;
         grpRegion.TabStop = false;
         grpRegion.Text = "识别区域";
@@ -186,14 +188,16 @@ public sealed partial class TextOcrTestForm
         regionLayout.Controls.Add(txtRegionWidth, 1, 2);
         regionLayout.Controls.Add(lblRegionHeight, 0, 3);
         regionLayout.Controls.Add(txtRegionHeight, 1, 3);
+        regionLayout.Controls.Add(btnPickRegion, 0, 4);
         regionLayout.Dock = DockStyle.Fill;
         regionLayout.Location = new Point(10, 26);
         regionLayout.Name = "regionLayout";
-        regionLayout.RowCount = 4;
+        regionLayout.RowCount = 5;
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
         regionLayout.Size = new Size(298, 138);
         regionLayout.TabIndex = 0;
         //
@@ -235,6 +239,18 @@ public sealed partial class TextOcrTestForm
         txtRegionHeight.Location = new Point(99, 105);
         txtRegionHeight.Name = "txtRegionHeight";
         txtRegionHeight.Size = new Size(196, 23);
+        //
+        // btnPickRegion
+        //
+        btnPickRegion.Dock = DockStyle.Fill;
+        btnPickRegion.Location = new Point(3, 139);
+        btnPickRegion.Name = "btnPickRegion";
+        btnPickRegion.Size = new Size(292, 34);
+        btnPickRegion.TabIndex = 8;
+        btnPickRegion.Text = "选取区域";
+        btnPickRegion.UseVisualStyleBackColor = true;
+        btnPickRegion.Click += btnPickRegion_Click;
+        regionLayout.SetColumnSpan(btnPickRegion, 2);
         //
         // grpOptions
         //

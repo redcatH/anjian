@@ -35,6 +35,7 @@ internal sealed class SettlementWorkflow
         var sbicTemplatePath = GetRunnerAssetPath("社保IC卡.png");
 
         var amountRegion = new Rectangle(2767, 301, 148, 33);
+        var amountInputVerifyRegion = new Rectangle(2767, 301, 148, 33);
         var amountPageFeatureRegion = new Rectangle(2720, 280, 240, 100);
         var amountPageFeatureTemplatePath = GetRunnerAssetPath("金额页特征.png");
         var amountPageProbeOptions = new AmountOcrOptions(
@@ -42,6 +43,11 @@ internal sealed class SettlementWorkflow
             true,
             160,
             false);
+        var amountInputVerifyOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
 
         var zhOptions = new ImageMatchOptions(
             new Rectangle(0, 0, 60, 800),
@@ -78,56 +84,87 @@ internal sealed class SettlementWorkflow
             180,
             true);
 
+        var numberActionVerifyOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var careTypeSelectedTextRegion = new Rectangle(640, 930, 300, 90);
+        var careTypeSelectedTextOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var careTypeDropdownOptionRegion = new Rectangle(600, 780, 520, 320);
+        var careTypeDropdownOptionOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var chargeItemSelectedTextRegion = new Rectangle(2140, -30, 520, 80);
+        var chargeItemSelectedTextOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var firstNumberActionVerifyRegion = new Rectangle(2207, 90, 100, 600);
+        var secondNumberActionVerifyRegion = new Rectangle(2207, 90, 100, 600);
+
+        var numberInputOptions = new KeyboardTextInputOptions(
+            Mode: KeyboardTextInputMode.ClipboardPaste,
+            RestoreClipboard: true);
+
         var settlementPopupSteps = new OcrPopupStep[]
         {
-            // 示例：
-            // new OcrPopupStep(
-            //     "确认结算弹窗",
-            //     settlementDialogTextRegion,
-            //     settlementDialogTextOcrOptions,
-            //     new[] { "确认结算", "是否继续" },
-            //     new Rectangle(...),
-            //     settlementDialogTextOcrOptions,
-            //     regions => ChoosePopupButtonPoint(regions, "继续", "确定", "是"),
-            //     delayAfterHandleMilliseconds: 1000),
+            // 先留空，后续把已知结算弹窗的 OCR 处理规则加在这里。
         };
-        var pdRegion = new Rectangle(2207, 90, 100, 600);
+
         var steps = new IAutomationStep[]
         {
             new MouseMoveStep(1942, 112),
             new LeftClickStep(1942, 112),
             new DelayStep(1000),
 
-            new LeftClickStep(2226, -56),
-            new DelayStep(500),
-            new DelegateStep("清空", () => ClearInput(keyboard)),
-            new DelayStep(1500),
-            new TextInputStep(number),
-            new DelayStep(500),
-            new HotKeyStep(Keys.Enter),
-            new DelayStep(2000),
-            new DelegateStep("检查目标图片，不存在则跳过当前号码", () =>
-            {
-                var result = FindImage(
-                    capture,
-                    matcher,
-                    zhTemplatePath,
-                    zhOptions with { SearchRegion = pdRegion, UseGrayscale = false});
-
-                if (!result.Success || result.Location is null)
+            new VerifiedActionStep(
+                "输入号码并确认页面切换成功",
+                number,
+                new IAutomationStep[]
                 {
-                    throw new SkipCurrentRunException("未找到目标图片，跳过当前号码。");
-                }
-            }),
-            new WaitStep("选择继续或跳过本次。"),
+                    new LeftClickStep(2226, -56),
+                    new DelayStep(500),
+                    new DelegateStep("清空号码输入框", () => ClearInput(keyboard)),
+                    new DelayStep(1500),
+                    new TextInputStep(number, numberInputOptions),
+                    new DelayStep(500),
+                    new HotKeyStep(Keys.Enter),
+                },
+                new IVerificationCheck[]
+                {
+                    new OcrTextCheck(
+                        "验证区域包含输入号码",
+                        firstNumberActionVerifyRegion,
+                        numberActionVerifyOcrOptions,
+                        OcrTextMatchMode.Contains,
+                        ctx => ctx.ActionValue),
+                },
+                maxRetryAttempts: 2,
+                retryDelayMilliseconds: 1000,
+                manualInterventionReason: "输入号码后校验失败。请确认号码是否已经正确加载，然后按 F3 继续，或按 F4 跳过。",
+                postActionDelayMilliseconds: 2000),
+
+            new WaitStep("请选择继续或跳过本次。"),
             new LeftClickStep(2222, -19),
 
             new ConditionalStep(
-                "如果未找到内科则输入 nk 并回车",
+                "如果当前不是内科则输入 nk 并确认",
                 _ =>
                 {
                     var exists = HasImage(capture, matcher, departmentRegion, departmentTemplatePath);
-                    Console.WriteLine($"内科：{(exists ? "存在" : "不存在")}");
+                    Console.WriteLine($"内科标识存在：{exists}");
                     return !exists;
                 },
                 new IAutomationStep[]
@@ -135,7 +172,7 @@ internal sealed class SettlementWorkflow
                     new TextInputStep("nk"),
                     new DelayStep(1000),
                     new HotKeyStep(Keys.Enter),
-                    new DelayStep(1000)
+                    new DelayStep(1000),
                 }),
 
             new EnsureConditionStep(
@@ -143,7 +180,7 @@ internal sealed class SettlementWorkflow
                 _ =>
                 {
                     var checkedYjs = HasImage(capture, matcher, yjsRegion, yjsTemplatePath, useGrayscale: false);
-                    Console.WriteLine($"预结算：{(checkedYjs ? "已勾选" : "未勾选")}");
+                    Console.WriteLine($"预结算已勾选：{checkedYjs}");
                     return checkedYjs;
                 },
                 new IAutomationStep[]
@@ -153,14 +190,14 @@ internal sealed class SettlementWorkflow
                 },
                 maxRetryAttempts: 5,
                 retryDelayMilliseconds: 800,
-                manualInterventionReason: "请确认“预结算”已勾选。若自动勾选失败，请手工处理后按 F3 继续，或按 F4 跳过本次。"),
+                manualInterventionReason: "请确认预结算已经勾选，然后按 F3 继续，或按 F4 跳过。"),
 
             new EnsureConditionStep(
                 "确保已勾选社保 IC 卡",
                 _ =>
                 {
                     var exists = HasImage(capture, matcher, sbicRegion, sbicTemplatePath);
-                    Console.WriteLine($"社保IC卡：{(exists ? "已勾选" : "未勾选")}");
+                    Console.WriteLine($"社保 IC 卡已勾选：{exists}");
                     return exists;
                 },
                 new IAutomationStep[]
@@ -168,11 +205,11 @@ internal sealed class SettlementWorkflow
                     new MouseMoveStep(2652, 835),
                     new LeftClickStep(2652, 835),
                     new MouseMoveStep(2602, 788),
-                    new LeftClickStep(2602, 788)
+                    new LeftClickStep(2602, 788),
                 },
                 maxRetryAttempts: 5,
                 retryDelayMilliseconds: 800,
-                manualInterventionReason: "请确认“社保IC卡”已勾选。若自动勾选失败，请手工处理后按 F3 继续，或按 F4 跳过本次。"),
+                manualInterventionReason: "请确认社保 IC 卡已经勾选，然后按 F3 继续，或按 F4 跳过。"),
 
             new SettlementNavigationStep(
                 "点击结算后进入金额识别页",
@@ -189,7 +226,7 @@ internal sealed class SettlementWorkflow
                     amountPageProbeOptions),
                 settlementPopupSteps,
                 maxIterations: 12,
-                manualInterventionReason: "结算后未识别到已知弹窗，也尚未进入金额识别页。请手工处理当前弹窗或页面后按 F3 继续，或按 F4 跳过本次。",
+                manualInterventionReason: "点击结算后，既未命中已知弹窗，也尚未进入金额识别页。请手工处理后按 F3 继续，或按 F4 跳过。",
                 iterationDelayMilliseconds: 1000),
 
             new DelegateStep("识别金额并保存", () =>
@@ -198,28 +235,28 @@ internal sealed class SettlementWorkflow
 
                 if (recognizedAmount.Success)
                 {
-                    Console.WriteLine($"金额：{recognizedAmount.Amount}，标准文本：{recognizedAmount.NormalizedText}");
+                    Console.WriteLine($"金额识别成功：{recognizedAmount.Amount}，标准文本：{recognizedAmount.NormalizedText}");
                     return;
                 }
 
-                Console.WriteLine($"金额识别失败：{recognizedAmount.Message}");
-                context.ExecutionController.WaitForContinue("金额识别失败。请确认现场后按 F3 在控制台手工输入金额，或按 F4 跳过本次。");
+                Console.WriteLine($"金额 OCR 失败：{recognizedAmount.Message}");
+                context.ExecutionController.WaitForContinue("金额 OCR 失败。请按 F3 在控制台手工输入金额，或按 F4 跳过。");
 
                 var manualAmountInputStep = new ManualAmountInputStep(
                     "手工输入金额",
-                    "请在控制台输入本次金额，然后按回车：",
+                    "请在控制台输入金额后按回车：",
                     result => recognizedAmount = result);
                 manualAmountInputStep.Execute(context);
 
-                Console.WriteLine($"金额：{recognizedAmount!.Amount}，来源：手工输入");
+                Console.WriteLine($"手工录入金额：{recognizedAmount!.Amount}");
             }),
-            //点击关闭按钮（如果存在）
+
             new ConditionalStep(
                 "如果关闭按钮存在则点击",
                 _ =>
                 {
                     var exists = HasImage(capture, matcher, closeButtonRegion, closeButtonTemplatePath);
-                    Console.WriteLine($"关闭按钮：{(exists ? "存在" : "不存在")}");
+                    Console.WriteLine($"关闭按钮存在：{exists}");
                     return exists;
                 },
                 new IAutomationStep[]
@@ -228,55 +265,141 @@ internal sealed class SettlementWorkflow
                     new LeftClickStep(2607, 349),
                     new DelayStep(2000),
                 }),
-            new WaitStep("是否继续医保费用,F3继续 F4结束"),
-            //继续第二步骤
-            new MouseMoveStep(1943, 16),
-            new LeftClickStep(1943, 16),
-            new DelayStep(1000),
-            new LeftClickStep(2234, -61),
-            new DelegateStep("清空 input", () => ClearInput(keyboard)),
-            new DelayStep(1000),
-            new TextInputStep(number),
-            new HotKeyStep(Keys.Enter),
 
-            new OcrPopupStep(
-                "处理未保存编辑继续弹窗",
-                unsavedEditPopupTextRegion,
-                unsavedEditPopupTextOcrOptions,
-                new[] { "未保存", "继续", "下一个用户" },
-                unsavedEditPopupButtonRegion,
-                unsavedEditPopupButtonOcrOptions,
-                regions => ChoosePopupButtonPoint(regions, "继续", "确定", "是"),
-                delayBeforeCheckMilliseconds: 1000,
-                delayAfterHandleMilliseconds: 1000,
-                recheckCount: 5),
+            new WaitStep("是否继续医保费用流程？F3 继续，F4 结束。"),
+
+            new VerifiedActionStep(
+                "再次输入号码并确认页面切换成功",
+                number,
+                new IAutomationStep[]
+                {
+                    new MouseMoveStep(1943, 16),
+                    new LeftClickStep(1943, 16),
+                    new DelayStep(1000),
+                    new LeftClickStep(2234, -61),
+                    new DelegateStep("再次清空号码输入框", () => ClearInput(keyboard)),
+                    new DelayStep(1000),
+                    new TextInputStep(number, numberInputOptions),
+                    new HotKeyStep(Keys.Enter),
+                    new OcrPopupStep(
+                        "处理未保存编辑弹窗",
+                        unsavedEditPopupTextRegion,
+                        unsavedEditPopupTextOcrOptions,
+                        new[] { "未保存", "继续", "下一个用户" },
+                        unsavedEditPopupButtonRegion,
+                        unsavedEditPopupButtonOcrOptions,
+                        regions => ChooseTextCenterPoint(regions, "继续", "确定", "是"),
+                        delayBeforeCheckMilliseconds: 1000,
+                        delayAfterHandleMilliseconds: 1000,
+                        recheckCount: 5),
+                },
+                new IVerificationCheck[]
+                {
+                    new OcrTextCheck(
+                        "验证第二处区域包含输入号码",
+                        secondNumberActionVerifyRegion,
+                        numberActionVerifyOcrOptions,
+                        OcrTextMatchMode.Contains,
+                        ctx => ctx.ActionValue),
+                },
+                maxRetryAttempts: 2,
+                retryDelayMilliseconds: 1000,
+                manualInterventionReason: "再次输入号码后校验失败。请确认号码是否已经正确加载，然后按 F3 继续，或按 F4 跳过。",
+                postActionDelayMilliseconds: 1000),
 
             new DelayStep(1000),
 
-            //创建右键新的条目
             new RightClickStep(2406, 243),
             new DelayStep(6000),
-            new MouseMoveStep(2406 + 67, 243 + 134),
-            new LeftClickStep(2406 + 67, 243 + 134),
+            new MouseMoveStep(2473, 377),
+            new LeftClickStep(2473, 377),
             new DelayStep(3000),
             new HotKeyStep(Keys.Enter),
 
-            new LeftClickStep(729, 973),
-            new WaitStep("请确认后手工录入本床护理费，或跳过本次。"),
+            new VerifiedActionStep(
+                "选择居家护理费类型",
+                "居家护理费",
+                new IAutomationStep[]
+                {
+                    //TODO 这里具体如何点击哪里还需要识别一下
+                    // new LeftClickStep(729, 973),
+                    new DelayStep(800),
+                    new DelegateStep(
+                        "通过 OCR 点击居家护理费选项",
+                        () => ClickTextInRegionByOcr(
+                            capture,
+                            generalOcr,
+                            mouse,
+                            careTypeDropdownOptionRegion,
+                            careTypeDropdownOptionOcrOptions,
+                            "居家护理费")),
+                },
+                new IVerificationCheck[]
+                {
+                    new OcrTextCheck(
+                        "验证护理费类型文本",
+                        careTypeSelectedTextRegion,
+                        careTypeSelectedTextOcrOptions,
+                        OcrTextMatchMode.Contains,
+                        ctx => ctx.ActionValue),
+                },
+                maxRetryAttempts: 4,
+                retryDelayMilliseconds: 1000,
+                manualInterventionReason: "切换到居家护理费类型失败。请手工处理后按 F3 继续，或按 F4 跳过。",
+                postActionDelayMilliseconds: 1200),
 
-            new LeftClickStep(2357, 0),
-            new TextInputStep("jjzh"),
-            new HotKeyStep(Keys.Enter),
-            new DelayStep(2500),
+            new VerifiedActionStep(
+                "输入收费项目并确认显示结果",
+                "jjzh",
+                new IAutomationStep[]
+                {
+                    new LeftClickStep(2357, 0),
+                    new TextInputStep("jjzh", numberInputOptions),
+                    new HotKeyStep(Keys.Enter),
+                },
+                new IVerificationCheck[]
+                {
+                    new OcrTextCheck(
+                        "验证收费项目显示文本",
+                        chargeItemSelectedTextRegion,
+                        chargeItemSelectedTextOcrOptions,
+                        OcrTextMatchMode.Contains,
+                        ctx => ctx.ActionValue,
+                        (ctx, observed, expected) => VerifyChargeItemSelection(ctx, observed, expected)),
+                },
+                maxRetryAttempts: 2,
+                retryDelayMilliseconds: 1000,
+                manualInterventionReason: "收费项目校验失败。请手工处理后按 F3 继续，或按 F4 跳过。",
+                postActionDelayMilliseconds: 2500),
 
-            new LeftClickStep(2169, 46),
-            new DelegateStep("输入金额", () =>
-            {
-                context.Keyboard.HotKey(Keys.Back);
-                context.Keyboard.TextInput(recognizedAmount!.RawText);
-            }),
+            new VerifiedActionStep(
+                "输入金额并确认显示结果",
+                recognizedAmount!.RawText,
+                new IAutomationStep[]
+                {
+                    new LeftClickStep(2169, 46),
+                    new DelegateStep("输入金额文本", () =>
+                    {
+                        context.Keyboard.HotKey(Keys.Back);
+                        context.Keyboard.TextInput(recognizedAmount.RawText, numberInputOptions);
+                    }),
+                },
+                new IVerificationCheck[]
+                {
+                    new OcrTextCheck(
+                        "验证金额显示文本",
+                        amountInputVerifyRegion,
+                        amountInputVerifyOcrOptions,
+                        OcrTextMatchMode.Contains,
+                        ctx => ctx.ActionValue,
+                        (ctx, observed, expected) => VerifyAmountDisplay(ctx, observed, expected)),
+                },
+                maxRetryAttempts: 2,
+                retryDelayMilliseconds: 800,
+                manualInterventionReason: "金额校验失败。请手工处理后按 F3 继续，或按 F4 跳过。",
+                postActionDelayMilliseconds: 800),
 
-            new DelegateStep("查找新增条目", () =>
+            new DelegateStep("查找新增行", () =>
             {
                 var result = FindImage(
                     capture,
@@ -306,7 +429,7 @@ internal sealed class SettlementWorkflow
                 _ =>
                 {
                     var checkedYjs = HasImage(capture, matcher, yjsRegion, yjsTemplatePath);
-                    Console.WriteLine($"预结算：{(checkedYjs ? "已勾选" : "未勾选")}");
+                    Console.WriteLine($"完成后预结算仍为勾选状态：{checkedYjs}");
                     return !checkedYjs;
                 },
                 new IAutomationStep[]
@@ -316,25 +439,6 @@ internal sealed class SettlementWorkflow
                 },
                 maxRetryAttempts: 3,
                 retryDelayMilliseconds: 800),
-
-            //正式结算
-            new SettlementNavigationStep(
-                "点击结算后进入金额识别页",
-                new IAutomationStep[]
-                {
-                    new MouseMoveStep(2515, 831),
-                    new LeftClickStep(2515, 831),
-                },
-                ctx => IsAmountRecognitionPageReady(
-                    ctx,
-                    amountPageFeatureRegion,
-                    amountPageFeatureTemplatePath,
-                    amountRegion,
-                    amountPageProbeOptions),
-                settlementPopupSteps,
-                maxIterations: 12,
-                manualInterventionReason: "结算后未识别到已知弹窗，也尚未进入金额识别页。请手工处理当前弹窗或页面后按 F3 继续，或按 F4 跳过本次。",
-                iterationDelayMilliseconds: 1000),
         };
 
         new AutomationRunner().Run(steps, context);
@@ -348,6 +452,39 @@ internal sealed class SettlementWorkflow
         Thread.Sleep(500);
         keyboard.HotKey(Keys.Back, Keys.Back, Keys.Back, Keys.Back, Keys.Back, Keys.Back, Keys.Back);
         Thread.Sleep(500);
+    }
+
+    private static void ClickTextInRegionByOcr(
+        ScreenCaptureService capture,
+        IGeneralOcrService generalOcr,
+        IMouseService mouse,
+        Rectangle region,
+        GeneralOcrOptions options,
+        params string[] targetTexts)
+    {
+        using var source = capture.Capture(region);
+        var result = generalOcr.RecognizeRegionsAsync(source, options).GetAwaiter().GetResult();
+        if (!result.Success)
+        {
+            throw new InvalidOperationException($"OCR 读取下拉选项失败：{result.Message}");
+        }
+
+        var absoluteRegions = result.SafeRegions
+            .Select(item => item with
+            {
+                Bounds = new Rectangle(item.Bounds.X + region.X, item.Bounds.Y + region.Y, item.Bounds.Width, item.Bounds.Height),
+                Center = new GeneralOcrPoint(item.Center.X + region.X, item.Center.Y + region.Y)
+            })
+            .ToArray();
+
+        var clickPoint = ChooseTextCenterPoint(absoluteRegions, targetTexts);
+        if (clickPoint is null)
+        {
+            throw new InvalidOperationException($"OCR 未找到目标文本：{string.Join(", ", targetTexts)}");
+        }
+
+        mouse.MoveTo(clickPoint.Value.X, clickPoint.Value.Y);
+        mouse.LeftClick(clickPoint.Value.X, clickPoint.Value.Y);
     }
 
     private static string GetRunnerAssetPath(string fileName)
@@ -365,7 +502,7 @@ internal sealed class SettlementWorkflow
         if (File.Exists(featureTemplatePath))
         {
             var matched = HasImage(context.Capture, context.Matcher, featureRegion, featureTemplatePath);
-            Console.WriteLine($"金额页模板判定：{(matched ? "命中" : "未命中")}，模板：{featureTemplatePath}");
+            Console.WriteLine($"金额页特征图匹配结果：{matched}");
             if (matched)
             {
                 return true;
@@ -373,34 +510,23 @@ internal sealed class SettlementWorkflow
         }
         else
         {
-            Console.WriteLine($"金额页模板不存在，回退到金额 OCR 探测：{featureTemplatePath}");
+            Console.WriteLine($"金额页特征图不存在，回退到金额 OCR：{featureTemplatePath}");
         }
 
         var amountResult = ReadAmount(context.Capture, context.ImagePreprocess, context.Ocr, amountRegion, ocrOptions);
         var ready = amountResult.Success && amountResult.Amount is not null;
-        Console.WriteLine(
-            $"金额 OCR 探测：{(ready ? "已就绪" : "未就绪")}，原始文本：{amountResult.RawText}，标准文本：{amountResult.NormalizedText}");
+        Console.WriteLine($"金额 OCR 就绪：{ready}，原始文本：{amountResult.RawText}，标准文本：{amountResult.NormalizedText}");
         return ready;
     }
 
-    private static GeneralOcrResult ReadText(
-        ScreenCaptureService capture,
-        IGeneralOcrService generalOcr,
-        Rectangle region,
-        GeneralOcrOptions options)
-    {
-        using var source = capture.Capture(region);
-        return generalOcr.RecognizeTextAsync(source, options).GetAwaiter().GetResult();
-    }
-
-    private static Point? ChoosePopupButtonPoint(IReadOnlyList<GeneralOcrRegion> regions, params string[] buttonTexts)
+    private static Point? ChooseTextCenterPoint(IReadOnlyList<GeneralOcrRegion> regions, params string[] targetTexts)
     {
         if (regions.Count == 0)
         {
             return null;
         }
 
-        var normalizedTargets = buttonTexts
+        var normalizedTargets = targetTexts
             .Where(text => !string.IsNullOrWhiteSpace(text))
             .Select(GeneralTextNormalizer.NormalizeText)
             .ToArray();
@@ -420,6 +546,93 @@ internal sealed class SettlementWorkflow
         }
 
         return null;
+    }
+
+    private static VerificationResult VerifyChargeItemSelection(
+        VerifiedActionContext context,
+        string observedValue,
+        string? expectedValue)
+    {
+        var expectedAliases = GetChargeItemExpectedAliases(context.ActionValue);
+        var matchedAlias = expectedAliases.FirstOrDefault(alias =>
+            observedValue.Contains(alias, StringComparison.OrdinalIgnoreCase));
+
+        if (matchedAlias is not null)
+        {
+            return new VerificationResult(
+                true,
+                $"收费项目校验通过。动作值={context.ActionValue}，命中文本={matchedAlias}，识别结果={observedValue}",
+                observedValue);
+        }
+
+        return new VerificationResult(
+            false,
+            $"收费项目校验失败。动作值={context.ActionValue}，期望别名={string.Join(" / ", expectedAliases)}，默认期望值={expectedValue}，识别结果={observedValue}",
+            observedValue);
+    }
+
+    private static string[] GetChargeItemExpectedAliases(string actionValue)
+    {
+        var normalizedActionValue = GeneralTextNormalizer.NormalizeText(actionValue);
+        return normalizedActionValue switch
+        {
+            "jjzh" => new[]
+            {
+                normalizedActionValue,
+                GeneralTextNormalizer.NormalizeText("居家护理费"),
+                GeneralTextNormalizer.NormalizeText("居家照护"),
+                GeneralTextNormalizer.NormalizeText("居家照护费"),
+            },
+            _ => new[]
+            {
+                normalizedActionValue
+            }
+        };
+    }
+
+    private static VerificationResult VerifyAmountDisplay(
+        VerifiedActionContext context,
+        string observedValue,
+        string? expectedValue)
+    {
+        if (TryParseDecimalFromText(observedValue, out var observedAmount) &&
+            TryParseDecimalFromText(expectedValue, out var expectedAmount))
+        {
+            if (observedAmount == expectedAmount)
+            {
+                return new VerificationResult(
+                    true,
+                    $"金额校验通过。期望金额={expectedAmount}，识别金额={observedAmount}",
+                    observedValue);
+            }
+
+            return new VerificationResult(
+                false,
+                $"金额校验失败。期望金额={expectedAmount}，识别金额={observedAmount}",
+                observedValue);
+        }
+
+        return new VerificationResult(
+            false,
+            $"金额校验失败。动作值={context.ActionValue}，默认期望值={expectedValue}，识别结果={observedValue}",
+            observedValue);
+    }
+
+    private static bool TryParseDecimalFromText(string? text, out decimal value)
+    {
+        value = 0m;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var normalized = new string(text.Where(ch => char.IsDigit(ch) || ch == '.' || ch == '-').ToArray());
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        return decimal.TryParse(normalized, out value);
     }
 
     private static ImageMatchResult FindImage(
@@ -507,7 +720,7 @@ internal sealed class SettlementWorkflow
             var screenPoint = new Point(
                 result.Location.Value.X + captureRegion.X,
                 result.Location.Value.Y + captureRegion.Y);
-            Console.WriteLine($"命中坐标: {screenPoint.X}, {screenPoint.Y}");
+            Console.WriteLine($"命中屏幕坐标：{screenPoint.X}, {screenPoint.Y}");
         }
 
         return result.Success;

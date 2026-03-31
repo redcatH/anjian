@@ -9,6 +9,19 @@ namespace Anjian;
 
 public static class CodeSnippetBuilder
 {
+    public static string FormatRectangleDeclaration(string variableName, Rectangle region)
+    {
+        var safeVariableName = string.IsNullOrWhiteSpace(variableName) ? "rect" : variableName.Trim();
+        return $"var {safeVariableName} = new Rectangle({region.X}, {region.Y}, {region.Width}, {region.Height});";
+    }
+
+    public static CodeSnippetResult BuildRectangleDeclaration(string variableName, Rectangle region)
+    {
+        var code = FormatRectangleDeclaration(variableName, region);
+
+        return new CodeSnippetResult("区域定义代码", code, "生成可直接用于截图、找图或 OCR 的 Rectangle 定义。");
+    }
+
     public static CodeSnippetResult BuildMouseMove(int x, int y)
     {
         var code = $$"""

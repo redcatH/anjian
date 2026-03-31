@@ -19,7 +19,7 @@ public sealed class MouseMoveStep : IAutomationStep
 
     public int Y { get; }
 
-    public string Name => $"鼠标移动到 ({X}, {Y})";
+    public string Name => $"移动鼠标到 ({X}, {Y})";
 
     public void Execute(AutomationContext context)
     {
@@ -288,6 +288,340 @@ public sealed class EnsureConditionStep : IAutomationStep
         }
 
         throw new InvalidOperationException($"{Name} 失败，目标条件仍未满足。");
+    }
+}
+
+public sealed class VerifiedActionContext
+{
+    public VerifiedActionContext(string actionValue, int attempt, AutomationContext automationContext)
+    {
+        ActionValue = actionValue ?? throw new ArgumentNullException(nameof(actionValue));
+        Attempt = attempt;
+        AutomationContext = automationContext ?? throw new ArgumentNullException(nameof(automationContext));
+    }
+
+    public string ActionValue { get; }
+
+    public int Attempt { get; }
+
+    public AutomationContext AutomationContext { get; }
+}
+
+public sealed record VerificationResult(
+    bool Success,
+    string Message,
+    string? ObservedValue = null);
+
+public interface IVerificationCheck
+{
+    string Name { get; }
+
+    VerificationResult Verify(VerifiedActionContext context);
+}
+
+public enum OcrTextMatchMode
+{
+    Equals = 0,
+    Contains = 1,
+    NotEmpty = 2,
+}
+
+public sealed class OcrTextCheck : IVerificationCheck
+{
+    private readonly Rectangle _region;
+    private readonly GeneralOcrOptions _options;
+    private readonly OcrTextMatchMode _matchMode;
+    private readonly Func<VerifiedActionContext, string?>? _expectedValueFactory;
+    private readonly Func<VerifiedActionContext, string, string?, VerificationResult>? _customVerifier;
+
+    public OcrTextCheck(
+        string name,
+        Rectangle region,
+        GeneralOcrOptions options,
+        OcrTextMatchMode matchMode,
+        string? expectedValue = null)
+        : this(name, region, options, matchMode, _ => expectedValue, null)
+    {
+    }
+
+    public OcrTextCheck(
+        string name,
+        Rectangle region,
+        GeneralOcrOptions options,
+        OcrTextMatchMode matchMode,
+        Func<VerifiedActionContext, string?>? expectedValueFactory)
+        : this(name, region, options, matchMode, expectedValueFactory, null)
+    {
+    }
+
+    public OcrTextCheck(
+        string name,
+        Rectangle region,
+        GeneralOcrOptions options,
+        OcrTextMatchMode matchMode,
+        Func<VerifiedActionContext, string?>? expectedValueFactory,
+        Func<VerifiedActionContext, string, string?, VerificationResult>? customVerifier)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "OCR 文本校验" : name;
+        _region = region;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _matchMode = matchMode;
+        _expectedValueFactory = expectedValueFactory;
+        _customVerifier = customVerifier;
+    }
+
+    public string Name { get; }
+
+    public VerificationResult Verify(VerifiedActionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        using var source = context.AutomationContext.Capture.Capture(_region);
+        var result = context.AutomationContext.GeneralOcr
+            .RecognizeTextAsync(source, _options)
+            .GetAwaiter()
+            .GetResult();
+
+        var observedValue = result.NormalizedText;
+        if (!result.Success)
+        {
+            return new VerificationResult(false, $"{Name} 失败：{result.Message}", observedValue);
+        }
+
+        var expectedValue = _expectedValueFactory?.Invoke(context);
+        var normalizedExpected = expectedValue is null
+            ? null
+            : GeneralTextNormalizer.NormalizeText(expectedValue);
+
+        if (_customVerifier is not null)
+        {
+            return _customVerifier(context, observedValue, normalizedExpected);
+        }
+
+        var success = _matchMode switch
+        {
+            OcrTextMatchMode.Equals => !string.IsNullOrWhiteSpace(normalizedExpected) &&
+                                       string.Equals(observedValue, normalizedExpected, StringComparison.OrdinalIgnoreCase),
+            OcrTextMatchMode.Contains => !string.IsNullOrWhiteSpace(normalizedExpected) &&
+                                         observedValue.Contains(normalizedExpected, StringComparison.OrdinalIgnoreCase),
+            OcrTextMatchMode.NotEmpty => !string.IsNullOrWhiteSpace(observedValue),
+            _ => false,
+        };
+
+        var message = _matchMode switch
+        {
+            OcrTextMatchMode.Equals => $"{Name} 期望等于：{normalizedExpected}，实际为：{observedValue}",
+            OcrTextMatchMode.Contains => $"{Name} 期望包含：{normalizedExpected}，实际为：{observedValue}",
+            OcrTextMatchMode.NotEmpty => $"{Name} 期望非空，实际为：{observedValue}",
+            _ => $"{Name} 未知校验类型",
+        };
+
+        return new VerificationResult(success, message, observedValue);
+    }
+}
+
+public sealed class ImagePresenceCheck : IVerificationCheck
+{
+    private readonly Rectangle _captureRegion;
+    private readonly string _templatePath;
+    private readonly bool _shouldExist;
+    private readonly double _threshold;
+    private readonly bool _useGrayscale;
+    private readonly int _step;
+    private readonly ImageMatchMode _matchMode;
+    private readonly ImageScanDirection _scanDirection;
+
+    public ImagePresenceCheck(
+        string name,
+        Rectangle captureRegion,
+        string templatePath,
+        bool shouldExist = true,
+        double threshold = 0.90,
+        bool useGrayscale = true,
+        int step = 1,
+        ImageMatchMode matchMode = ImageMatchMode.First,
+        ImageScanDirection scanDirection = ImageScanDirection.TopToBottom)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "图片存在校验" : name;
+        _captureRegion = captureRegion;
+        _templatePath = string.IsNullOrWhiteSpace(templatePath)
+            ? throw new ArgumentException("Template path is required.", nameof(templatePath))
+            : templatePath;
+        _shouldExist = shouldExist;
+        _threshold = threshold;
+        _useGrayscale = useGrayscale;
+        _step = step;
+        _matchMode = matchMode;
+        _scanDirection = scanDirection;
+    }
+
+    public string Name { get; }
+
+    public VerificationResult Verify(VerifiedActionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (!System.IO.File.Exists(_templatePath))
+        {
+            return new VerificationResult(false, $"{Name} 失败：模板图片不存在：{_templatePath}");
+        }
+
+        using var sourceBitmap = context.AutomationContext.Capture.Capture(_captureRegion);
+        using var templateBitmap = new Bitmap(_templatePath);
+
+        var options = new ImageMatchOptions(
+            new Rectangle(0, 0, _captureRegion.Width, _captureRegion.Height),
+            _threshold,
+            _useGrayscale,
+            _step,
+            _matchMode,
+            _scanDirection);
+
+        var result = context.AutomationContext.Matcher.Find(sourceBitmap, templateBitmap, options);
+        var exists = result.Success;
+        var success = _shouldExist ? exists : !exists;
+        var expectation = _shouldExist ? "存在" : "不存在";
+        var observed = exists ? "存在" : "不存在";
+        return new VerificationResult(success, $"{Name} 期望{expectation}，实际为{observed}", observed);
+    }
+}
+
+public sealed class CustomCheck : IVerificationCheck
+{
+    private readonly Func<VerifiedActionContext, VerificationResult> _check;
+
+    public CustomCheck(string name, Func<AutomationContext, VerificationResult> check)
+        : this(
+            name,
+            check is null
+                ? throw new ArgumentNullException(nameof(check))
+                : context => check(context.AutomationContext))
+    {
+    }
+
+    public CustomCheck(string name, Func<VerifiedActionContext, VerificationResult> check)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "自定义校验" : name;
+        _check = check ?? throw new ArgumentNullException(nameof(check));
+    }
+
+    public string Name { get; }
+
+    public VerificationResult Verify(VerifiedActionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return _check(context);
+    }
+}
+
+public sealed class VerifiedActionStep : IAutomationStep
+{
+    private readonly string _actionValue;
+    private readonly IReadOnlyList<IAutomationStep> _entrySteps;
+    private readonly IReadOnlyList<IVerificationCheck> _checks;
+    private readonly int _maxRetryAttempts;
+    private readonly int _retryDelayMilliseconds;
+    private readonly string _manualInterventionReason;
+    private readonly int _postActionDelayMilliseconds;
+
+    public VerifiedActionStep(
+        string name,
+        string actionValue,
+        IReadOnlyList<IAutomationStep> entrySteps,
+        IReadOnlyList<IVerificationCheck> checks,
+        int maxRetryAttempts,
+        int retryDelayMilliseconds,
+        string manualInterventionReason,
+        int postActionDelayMilliseconds = 0)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "执行动作并验证" : name;
+        _actionValue = actionValue ?? throw new ArgumentNullException(nameof(actionValue));
+        _entrySteps = entrySteps ?? throw new ArgumentNullException(nameof(entrySteps));
+        _checks = checks ?? throw new ArgumentNullException(nameof(checks));
+        _maxRetryAttempts = Math.Max(0, maxRetryAttempts);
+        _retryDelayMilliseconds = Math.Max(0, retryDelayMilliseconds);
+        _manualInterventionReason = string.IsNullOrWhiteSpace(manualInterventionReason)
+            ? "动作后校验失败，请手工处理后按 F3 继续，或按 F4 跳过当前运行。"
+            : manualInterventionReason;
+        _postActionDelayMilliseconds = Math.Max(0, postActionDelayMilliseconds);
+    }
+
+    public string Name { get; }
+
+    public void Execute(AutomationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var runner = new AutomationRunner();
+        var totalAttempts = _maxRetryAttempts + 1;
+
+        for (var attempt = 1; attempt <= totalAttempts; attempt++)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 开始执行 {Name}，尝试 {attempt}/{totalAttempts}");
+
+            if (_entrySteps.Count > 0)
+            {
+                runner.Run(_entrySteps, context);
+            }
+
+            DelayIfNeeded(_postActionDelayMilliseconds);
+
+            var actionContext = new VerifiedActionContext(_actionValue, attempt, context);
+            var failedCheck = FindFirstFailedCheck(actionContext, out var verificationResult);
+            if (failedCheck is null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {Name} 校验通过。");
+                return;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {failedCheck.Name} 校验失败：{verificationResult!.Message}");
+            if (_retryDelayMilliseconds > 0 && attempt < totalAttempts)
+            {
+                DelayIfNeeded(_retryDelayMilliseconds);
+            }
+        }
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {Name} 超过自动重试次数，进入人工介入。");
+        context.ExecutionController.WaitForContinue(_manualInterventionReason);
+
+        var manualContext = new VerifiedActionContext(_actionValue, totalAttempts + 1, context);
+        var failedAfterManual = FindFirstFailedCheck(manualContext, out var manualResult);
+        if (failedAfterManual is null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 人工介入后 {Name} 校验通过。");
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"{Name} 失败：人工介入后仍未通过校验。失败校验项：{failedAfterManual.Name}，原因：{manualResult!.Message}");
+    }
+
+    private IVerificationCheck? FindFirstFailedCheck(
+        VerifiedActionContext actionContext,
+        out VerificationResult? verificationResult)
+    {
+        foreach (var check in _checks)
+        {
+            verificationResult = check.Verify(actionContext);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss}] 校验项：{check.Name} -> {(verificationResult.Success ? "通过" : "失败")}，{verificationResult.Message}");
+
+            if (!verificationResult.Success)
+            {
+                return check;
+            }
+        }
+
+        verificationResult = null;
+        return null;
+    }
+
+    private static void DelayIfNeeded(int milliseconds)
+    {
+        if (milliseconds > 0)
+        {
+            Thread.Sleep(milliseconds);
+        }
     }
 }
 

@@ -224,6 +224,30 @@ public sealed partial class TextOcrTestForm : Form
         GenerateSnippet(false);
     }
 
+    private void PickRegion()
+    {
+        Rectangle? initialRegion = null;
+        if (TryReadRegion(out var currentRegion))
+        {
+            initialRegion = currentRegion;
+        }
+
+        var selectedRegion = RegionSelectionService.PickRegion(this, initialRegion);
+        if (selectedRegion is null)
+        {
+            AppendLog("已取消区域选择。");
+            return;
+        }
+
+        txtRegionX.Text = selectedRegion.Value.X.ToString();
+        txtRegionY.Text = selectedRegion.Value.Y.ToString();
+        txtRegionWidth.Text = selectedRegion.Value.Width.ToString();
+        txtRegionHeight.Text = selectedRegion.Value.Height.ToString();
+        AppendLog($"已选定区域：X={selectedRegion.Value.X}, Y={selectedRegion.Value.Y}, W={selectedRegion.Value.Width}, H={selectedRegion.Value.Height}");
+        AppendLog(CodeSnippetBuilder.FormatRectangleDeclaration("rect", selectedRegion.Value));
+        GenerateSnippet(false);
+    }
+
     private void ReplaceCapturedBitmap(Bitmap bitmap)
     {
         _capturedBitmap?.Dispose();
@@ -321,6 +345,8 @@ public sealed partial class TextOcrTestForm : Form
     }
 
     private void btnCaptureRegion_Click(object? sender, EventArgs e) => CaptureRegionPreview();
+
+    private void btnPickRegion_Click(object? sender, EventArgs e) => PickRegion();
 
     private async void btnExecuteOcr_Click(object? sender, EventArgs e) => await ExecuteOcrAsync();
 
