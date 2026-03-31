@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -18,6 +20,7 @@ internal sealed class SettlementWorkflow
         var mouse = context.Mouse;
         var matcher = context.Matcher;
         var ocr = context.Ocr;
+        var generalOcr = context.GeneralOcr;
         var keyboard = context.Keyboard;
         var capture = context.Capture;
         var imagePreprocess = context.ImagePreprocess;
@@ -51,29 +54,55 @@ internal sealed class SettlementWorkflow
         var zhRegion = new Rectangle(2178, 5, 60, 800);
         var zhTemplatePath = GetRunnerAssetPath("最后.png");
 
-        var settlementDialogRules = new SettlementDialogRule[]
+        var settlementDialogTextRegion = new Rectangle(2240, 180, 420, 220);
+        var settlementDialogTextOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var unsavedEditPopupTextRegion = new Rectangle(2140, 220, 620, 220);
+        var unsavedEditPopupTextOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var unsavedEditPopupButtonRegion = new Rectangle(2260, 540, 360, 140);
+        var unsavedEditPopupButtonOcrOptions = new GeneralOcrOptions(
+            true,
+            true,
+            180,
+            true);
+
+        var settlementPopupSteps = new OcrPopupStep[]
         {
-            // 在这里追加已知弹窗规则。
-            // 规则顺序就是优先级；每轮只处理第一条命中的规则。
+            // 示例：
+            // new OcrPopupStep(
+            //     "确认结算弹窗",
+            //     settlementDialogTextRegion,
+            //     settlementDialogTextOcrOptions,
+            //     new[] { "确认结算", "是否继续" },
+            //     new Rectangle(...),
+            //     settlementDialogTextOcrOptions,
+            //     regions => ChoosePopupButtonPoint(regions, "继续", "确定", "是"),
+            //     delayAfterHandleMilliseconds: 1000),
         };
 
         var steps = new IAutomationStep[]
         {
-            new WaitStep("请检查勾选，选择继续或跳过本次"),
-
             new MouseMoveStep(1942, 112),
             new LeftClickStep(1942, 112),
             new DelayStep(1000),
 
             new LeftClickStep(2226, -56),
             new DelayStep(500),
-            new DelegateStep("清空", () => { ClearInput(keyboard); }),
+            new DelegateStep("清空", () => ClearInput(keyboard)),
             new DelayStep(1500),
             new TextInputStep(number),
             new DelayStep(500),
             new HotKeyStep(Keys.Enter),
-
-            new DelayStep(1000),
+            new WaitStep("选择继续或跳过本次。"),
             new LeftClickStep(2222, -19),
             new DelayStep(5000),
             new LeftClickStep(2222, -19),
@@ -98,7 +127,7 @@ internal sealed class SettlementWorkflow
                 "确保已勾选预结算",
                 _ =>
                 {
-                    var checkedYjs = HasImage(capture, matcher, yjsRegion, yjsTemplatePath);
+                    var checkedYjs = HasImage(capture, matcher, yjsRegion, yjsTemplatePath, useGrayscale: false);
                     Console.WriteLine($"预结算：{(checkedYjs ? "已勾选" : "未勾选")}");
                     return checkedYjs;
                 },
@@ -107,7 +136,7 @@ internal sealed class SettlementWorkflow
                     new MouseMoveStep(2403, 837),
                     new LeftClickStep(2403, 837),
                 },
-                maxRetryAttempts: 2,
+                maxRetryAttempts: 5,
                 retryDelayMilliseconds: 800,
                 manualInterventionReason: "请确认“预结算”已勾选。若自动勾选失败，请手工处理后按 F3 继续，或按 F4 跳过本次。"),
 
@@ -126,12 +155,12 @@ internal sealed class SettlementWorkflow
                     new MouseMoveStep(2602, 788),
                     new LeftClickStep(2602, 788)
                 },
-                maxRetryAttempts: 2,
+                maxRetryAttempts: 5,
                 retryDelayMilliseconds: 800,
                 manualInterventionReason: "请确认“社保IC卡”已勾选。若自动勾选失败，请手工处理后按 F3 继续，或按 F4 跳过本次。"),
 
             new SettlementNavigationStep(
-                "结算后进入金额识别页",
+                "点击结算后进入金额识别页",
                 new IAutomationStep[]
                 {
                     new MouseMoveStep(2515, 831),
@@ -143,8 +172,8 @@ internal sealed class SettlementWorkflow
                     amountPageFeatureTemplatePath,
                     amountRegion,
                     amountPageProbeOptions),
-                settlementDialogRules,
-                maxIterations: 10,
+                settlementPopupSteps,
+                maxIterations: 12,
                 manualInterventionReason: "结算后未识别到已知弹窗，也尚未进入金额识别页。请手工处理当前弹窗或页面后按 F3 继续，或按 F4 跳过本次。",
                 iterationDelayMilliseconds: 1000),
 
@@ -152,14 +181,24 @@ internal sealed class SettlementWorkflow
             {
                 recognizedAmount = ReadAmount(capture, imagePreprocess, ocr, amountRegion, amountPageProbeOptions);
 
-                if (!recognizedAmount.Success)
+                if (recognizedAmount.Success)
                 {
-                    throw new InvalidOperationException($"金额识别失败：{recognizedAmount.Message}");
+                    Console.WriteLine($"金额：{recognizedAmount.Amount}，标准文本：{recognizedAmount.NormalizedText}");
+                    return;
                 }
 
-                Console.WriteLine($"金额：{recognizedAmount.Amount}，标准文本：{recognizedAmount.NormalizedText}");
-            }),
+                Console.WriteLine($"金额识别失败：{recognizedAmount.Message}");
+                context.ExecutionController.WaitForContinue("金额识别失败。请确认现场后按 F3 在控制台手工输入金额，或按 F4 跳过本次。");
 
+                var manualAmountInputStep = new ManualAmountInputStep(
+                    "手工输入金额",
+                    "请在控制台输入本次金额，然后按回车：",
+                    result => recognizedAmount = result);
+                manualAmountInputStep.Execute(context);
+
+                Console.WriteLine($"金额：{recognizedAmount!.Amount}，来源：手工输入");
+            }),
+            //点击关闭按钮
             new DelayStep(500),
             new LeftClickStep(2607, 349),
             new DelayStep(2000),
@@ -168,12 +207,26 @@ internal sealed class SettlementWorkflow
             new LeftClickStep(1943, 16),
             new DelayStep(1000),
             new LeftClickStep(2234, -61),
-            new DelegateStep("清空 input", () => { ClearInput(keyboard); }),
+            new DelegateStep("清空 input", () => ClearInput(keyboard)),
             new DelayStep(1000),
             new TextInputStep(number),
             new HotKeyStep(Keys.Enter),
-            new DelayStep(2000),
 
+            new OcrPopupStep(
+                "处理未保存编辑继续弹窗",
+                unsavedEditPopupTextRegion,
+                unsavedEditPopupTextOcrOptions,
+                new[] { "未保存", "继续", "下一个用户" },
+                unsavedEditPopupButtonRegion,
+                unsavedEditPopupButtonOcrOptions,
+                regions => ChoosePopupButtonPoint(regions, "继续", "确定", "是"),
+                delayBeforeCheckMilliseconds: 1000,
+                delayAfterHandleMilliseconds: 1000,
+                recheckCount: 5),
+
+            new DelayStep(1000),
+
+            //创建右键新的条目
             new RightClickStep(2406, 243),
             new DelayStep(6000),
             new MouseMoveStep(2406 + 67, 243 + 134),
@@ -182,7 +235,7 @@ internal sealed class SettlementWorkflow
             new HotKeyStep(Keys.Enter),
 
             new LeftClickStep(729, 973),
-            new WaitStep("请确认后手工录入本床护理费，或跳过本次"),
+            new WaitStep("请确认后手工录入本床护理费，或跳过本次。"),
 
             new LeftClickStep(2357, 0),
             new TextInputStep("jjzh"),
@@ -221,26 +274,43 @@ internal sealed class SettlementWorkflow
             new LeftClickStep(1942, 112),
             new DelayStep(1000),
 
-            new ConditionalStep(
-                "如果已经勾选预结算则取消勾选",
+            new EnsureConditionStep(
+                "确保预结算已取消勾选",
                 _ =>
                 {
                     var checkedYjs = HasImage(capture, matcher, yjsRegion, yjsTemplatePath);
                     Console.WriteLine($"预结算：{(checkedYjs ? "已勾选" : "未勾选")}");
-                    return checkedYjs;
+                    return !checkedYjs;
                 },
                 new IAutomationStep[]
                 {
                     new MouseMoveStep(2403, 837),
                     new LeftClickStep(2403, 837),
-                }),
+                },
+                maxRetryAttempts: 3,
+                retryDelayMilliseconds: 800),
 
-            new MouseMoveStep(2515, 831),
-            new LeftClickStep(2515, 831)
+            //正式结算
+            new SettlementNavigationStep(
+                "点击结算后进入金额识别页",
+                new IAutomationStep[]
+                {
+                    new MouseMoveStep(2515, 831),
+                    new LeftClickStep(2515, 831),
+                },
+                ctx => IsAmountRecognitionPageReady(
+                    ctx,
+                    amountPageFeatureRegion,
+                    amountPageFeatureTemplatePath,
+                    amountRegion,
+                    amountPageProbeOptions),
+                settlementPopupSteps,
+                maxIterations: 12,
+                manualInterventionReason: "结算后未识别到已知弹窗，也尚未进入金额识别页。请手工处理当前弹窗或页面后按 F3 继续，或按 F4 跳过本次。",
+                iterationDelayMilliseconds: 1000),
         };
 
-        var runner = new AutomationRunner();
-        runner.Run(steps, context);
+        new AutomationRunner().Run(steps, context);
     }
 
     private static void ClearInput(IKeyboardService keyboard)
@@ -284,6 +354,45 @@ internal sealed class SettlementWorkflow
         Console.WriteLine(
             $"金额 OCR 探测：{(ready ? "已就绪" : "未就绪")}，原始文本：{amountResult.RawText}，标准文本：{amountResult.NormalizedText}");
         return ready;
+    }
+
+    private static GeneralOcrResult ReadText(
+        ScreenCaptureService capture,
+        IGeneralOcrService generalOcr,
+        Rectangle region,
+        GeneralOcrOptions options)
+    {
+        using var source = capture.Capture(region);
+        return generalOcr.RecognizeTextAsync(source, options).GetAwaiter().GetResult();
+    }
+
+    private static Point? ChoosePopupButtonPoint(IReadOnlyList<GeneralOcrRegion> regions, params string[] buttonTexts)
+    {
+        if (regions.Count == 0)
+        {
+            return null;
+        }
+
+        var normalizedTargets = buttonTexts
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Select(GeneralTextNormalizer.NormalizeText)
+            .ToArray();
+
+        foreach (var target in normalizedTargets)
+        {
+            var candidate = regions
+                .Where(region => region.NormalizedText.Contains(target, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(region => region.Center.Y)
+                .ThenByDescending(region => region.Center.X)
+                .FirstOrDefault();
+
+            if (candidate is not null)
+            {
+                return new Point((int)Math.Round(candidate.Center.X), (int)Math.Round(candidate.Center.Y));
+            }
+        }
+
+        return null;
     }
 
     private static ImageMatchResult FindImage(

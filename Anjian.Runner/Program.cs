@@ -21,6 +21,10 @@ internal static class Program
         var keyboard = new Win32KeyboardService();
         var capture = new ScreenCaptureService();
         var imagePreprocess = new ImagePreprocessService();
+        var generalOcrRuntimeOptions = new GeneralOcrRuntimeOptions(
+            Provider: OcrEngineType.PaddleSharp,
+            Device: GeneralOcrDeviceType.CpuMkl);
+        var generalOcr = GeneralOcrServiceFactory.Create(imagePreprocess, generalOcrRuntimeOptions);
         using var continueSignal = new GlobalF3ContinueSignal();
 
         var context = new AutomationContext(
@@ -28,6 +32,7 @@ internal static class Program
             keyboard,
             matcher,
             ocr,
+            generalOcr,
             capture,
             imagePreprocess,
             new ConsoleExecutionController(mode, continueSignal));
@@ -67,6 +72,7 @@ internal static class Program
         }
 
         Console.WriteLine("可用服务：Win32MouseService、TemplateMatcher、TesseractAmountOcrService、Win32KeyboardService");
+        Console.WriteLine($"中文 OCR：{generalOcrRuntimeOptions.Provider} / {generalOcrRuntimeOptions.Device}");
         Console.WriteLine("示例区域：{0}", new Rectangle(0, 0, 300, 120));
     }
 

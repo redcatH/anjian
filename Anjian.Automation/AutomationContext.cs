@@ -9,6 +9,7 @@ public sealed class AutomationContext
         IKeyboardService keyboard,
         IImageMatcher matcher,
         IOcrService ocr,
+        IGeneralOcrService generalOcr,
         ScreenCaptureService capture,
         ImagePreprocessService imagePreprocess,
         IExecutionController executionController)
@@ -17,6 +18,7 @@ public sealed class AutomationContext
         Keyboard = keyboard ?? throw new ArgumentNullException(nameof(keyboard));
         Matcher = matcher ?? throw new ArgumentNullException(nameof(matcher));
         Ocr = ocr ?? throw new ArgumentNullException(nameof(ocr));
+        GeneralOcr = generalOcr ?? throw new ArgumentNullException(nameof(generalOcr));
         Capture = capture ?? throw new ArgumentNullException(nameof(capture));
         ImagePreprocess = imagePreprocess ?? throw new ArgumentNullException(nameof(imagePreprocess));
         ExecutionController = executionController ?? throw new ArgumentNullException(nameof(executionController));
@@ -29,6 +31,8 @@ public sealed class AutomationContext
     public IImageMatcher Matcher { get; }
 
     public IOcrService Ocr { get; }
+
+    public IGeneralOcrService GeneralOcr { get; }
 
     public ScreenCaptureService Capture { get; }
 

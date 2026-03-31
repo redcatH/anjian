@@ -387,6 +387,12 @@ public sealed partial class MainForm : Form
         form.ShowDialog(this);
     }
 
+    private void btnOpenTextOcr_Click(object? sender, EventArgs e)
+    {
+        using var form = new TextOcrTestForm();
+        form.ShowDialog(this);
+    }
+
     private void btnCopySnippet_Click(object? sender, EventArgs e)
     {
         Clipboard.SetText(txtSnippet.Text);

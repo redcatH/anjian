@@ -9,20 +9,46 @@ public sealed class ImagePreprocessService
 {
     public Bitmap Preprocess(Bitmap source, AmountOcrOptions options)
     {
+        return PreprocessCore(
+            source,
+            options.UseGrayscale,
+            options.UseBinarization,
+            options.BinarizationThreshold,
+            options.Scale2x);
+    }
+
+    public Bitmap Preprocess(Bitmap source, GeneralOcrOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return PreprocessCore(
+            source,
+            options.UseGrayscale,
+            options.UseBinarization,
+            options.BinarizationThreshold,
+            options.Scale2x);
+    }
+
+    private static Bitmap PreprocessCore(
+        Bitmap source,
+        bool useGrayscale,
+        bool useBinarization,
+        int binarizationThreshold,
+        bool scale2x)
+    {
         ArgumentNullException.ThrowIfNull(source);
 
         var processed = new Bitmap(source);
-        if (options.UseGrayscale)
+        if (useGrayscale)
         {
             processed = ApplyTransform(processed, ToGrayscale);
         }
 
-        if (options.UseBinarization)
+        if (useBinarization)
         {
-            processed = ApplyTransform(processed, color => ToBinary(color, options.BinarizationThreshold));
+            processed = ApplyTransform(processed, color => ToBinary(color, binarizationThreshold));
         }
 
-        if (options.Scale2x)
+        if (scale2x)
         {
             processed = Scale(processed, 2);
         }

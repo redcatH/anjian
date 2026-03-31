@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -210,14 +211,14 @@ public sealed class ConditionalStep : IAutomationStep
     public void Execute(AutomationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+
         var branchSteps = _predicate(context) ? _whenTrueSteps : _whenFalseSteps;
         if (branchSteps.Count == 0)
         {
             return;
         }
 
-        var runner = new AutomationRunner();
-        runner.Run(branchSteps, context);
+        new AutomationRunner().Run(branchSteps, context);
     }
 }
 
@@ -286,38 +287,15 @@ public sealed class EnsureConditionStep : IAutomationStep
             }
         }
 
-        throw new InvalidOperationException($"{Name}失败，目标条件仍未满足。");
+        throw new InvalidOperationException($"{Name} 失败，目标条件仍未满足。");
     }
-}
-
-public sealed class SettlementDialogRule
-{
-    public SettlementDialogRule(
-        string name,
-        Func<AutomationContext, bool> isMatch,
-        IReadOnlyList<IAutomationStep> steps,
-        int postActionDelayMilliseconds = 0)
-    {
-        Name = string.IsNullOrWhiteSpace(name) ? "未命名弹窗规则" : name;
-        IsMatch = isMatch ?? throw new ArgumentNullException(nameof(isMatch));
-        Steps = steps ?? throw new ArgumentNullException(nameof(steps));
-        PostActionDelayMilliseconds = Math.Max(0, postActionDelayMilliseconds);
-    }
-
-    public string Name { get; }
-
-    public Func<AutomationContext, bool> IsMatch { get; }
-
-    public IReadOnlyList<IAutomationStep> Steps { get; }
-
-    public int PostActionDelayMilliseconds { get; }
 }
 
 public sealed class SettlementNavigationStep : IAutomationStep
 {
     private readonly IReadOnlyList<IAutomationStep> _entrySteps;
     private readonly Func<AutomationContext, bool> _targetDetector;
-    private readonly IReadOnlyList<SettlementDialogRule> _dialogRules;
+    private readonly IReadOnlyList<OcrPopupStep> _popupSteps;
     private readonly int _maxIterations;
     private readonly string _manualInterventionReason;
     private readonly int _iterationDelayMilliseconds;
@@ -326,15 +304,15 @@ public sealed class SettlementNavigationStep : IAutomationStep
         string name,
         IReadOnlyList<IAutomationStep> entrySteps,
         Func<AutomationContext, bool> targetDetector,
-        IReadOnlyList<SettlementDialogRule> dialogRules,
+        IReadOnlyList<OcrPopupStep> popupSteps,
         int maxIterations,
         string manualInterventionReason,
-        int iterationDelayMilliseconds = 0)
+        int iterationDelayMilliseconds = 1500)
     {
         Name = string.IsNullOrWhiteSpace(name) ? "结算导航" : name;
         _entrySteps = entrySteps ?? throw new ArgumentNullException(nameof(entrySteps));
         _targetDetector = targetDetector ?? throw new ArgumentNullException(nameof(targetDetector));
-        _dialogRules = dialogRules ?? throw new ArgumentNullException(nameof(dialogRules));
+        _popupSteps = popupSteps ?? throw new ArgumentNullException(nameof(popupSteps));
         _maxIterations = Math.Max(1, maxIterations);
         _manualInterventionReason = string.IsNullOrWhiteSpace(manualInterventionReason)
             ? "未识别到已知弹窗，请手工处理后按 F3 继续，或按 F4 跳过当前号码。"
@@ -368,37 +346,61 @@ public sealed class SettlementNavigationStep : IAutomationStep
                 return;
             }
 
-            var matchedRule = FindFirstMatchingRule(context);
-            if (matchedRule is not null)
+            var popupOutcome = TryHandleFirstPopup(context);
+            if (popupOutcome == OcrPopupHandleResult.Handled)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 命中弹窗规则：{matchedRule.Name}");
-                if (matchedRule.Steps.Count > 0)
-                {
-                    runner.Run(matchedRule.Steps, context);
-                }
-
-                DelayAfterAction(matchedRule.PostActionDelayMilliseconds);
+                DelayAfterAction(_iterationDelayMilliseconds);
                 continue;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 未命中任何已知弹窗规则，进入人工介入。");
-            context.ExecutionController.WaitForContinue($"{_manualInterventionReason} 当前轮次：{iteration}/{_maxIterations}");
-
-            if (IsTargetReached(context))
+            if (popupOutcome == OcrPopupHandleResult.MatchedButFailed)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 人工介入后已进入目标页面。");
-                return;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 已识别到弹窗但无法安全处理，进入人工介入。");
+                context.ExecutionController.WaitForContinue(_manualInterventionReason);
+                if (IsTargetReached(context))
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 人工介入后已进入目标页面。");
+                    return;
+                }
+
+                throw new InvalidOperationException($"{Name} 失败：弹窗已命中但自动处理失败，人工介入后仍未进入目标页面。");
             }
 
             DelayAfterAction(_iterationDelayMilliseconds);
+            if (IsTargetReached(context))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 已进入目标页面。");
+                return;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 未命中任何已知弹窗，继续等待界面变化。");
         }
 
-        throw new InvalidOperationException($"{Name}失败：超过最大轮次 {_maxIterations}，仍未进入目标页面。");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 超过最大轮次，进入人工介入。");
+        context.ExecutionController.WaitForContinue(_manualInterventionReason);
+
+        if (IsTargetReached(context))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 人工介入后已进入目标页面。");
+            return;
+        }
+
+        throw new InvalidOperationException($"{Name} 失败：超过最大轮次 {_maxIterations}，且人工介入后仍未进入目标页面。");
     }
 
-    private SettlementDialogRule? FindFirstMatchingRule(AutomationContext context)
+    private OcrPopupHandleResult TryHandleFirstPopup(AutomationContext context)
     {
-        return _dialogRules.FirstOrDefault(rule => rule.IsMatch(context));
+        foreach (var popupStep in _popupSteps)
+        {
+            var result = popupStep.TryHandle(context);
+            if (result != OcrPopupHandleResult.NotMatched)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 弹窗步骤结果：{popupStep.Name} -> {result}");
+                return result;
+            }
+        }
+
+        return OcrPopupHandleResult.NotMatched;
     }
 
     private bool IsTargetReached(AutomationContext context)
@@ -415,4 +417,209 @@ public sealed class SettlementNavigationStep : IAutomationStep
             Thread.Sleep(delayMilliseconds);
         }
     }
+}
+
+public sealed class ManualAmountInputStep : IAutomationStep
+{
+    private readonly Action<AmountOcrResult> _onAmountCaptured;
+    private readonly string _prompt;
+
+    public ManualAmountInputStep(string name, string prompt, Action<AmountOcrResult> onAmountCaptured)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "手工输入金额" : name;
+        _prompt = string.IsNullOrWhiteSpace(prompt) ? "请在控制台输入金额：" : prompt;
+        _onAmountCaptured = onAmountCaptured ?? throw new ArgumentNullException(nameof(onAmountCaptured));
+    }
+
+    public string Name { get; }
+
+    public void Execute(AutomationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        while (true)
+        {
+            Console.WriteLine(_prompt);
+            var input = Console.ReadLine()?.Trim();
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                Console.WriteLine("金额不能为空，请重新输入。");
+                continue;
+            }
+
+            var normalized = input.Replace(",", string.Empty);
+            if (!decimal.TryParse(normalized, out var amount))
+            {
+                Console.WriteLine($"无效金额：{input}，请重新输入。");
+                continue;
+            }
+
+            _onAmountCaptured(new AmountOcrResult(
+                true,
+                input,
+                normalized,
+                amount,
+                0L,
+                "用户手工输入金额成功。"));
+            return;
+        }
+    }
+}
+
+public sealed class OcrPopupStep : IAutomationStep
+{
+    private readonly Rectangle _contentRegion;
+    private readonly GeneralOcrOptions _contentOcrOptions;
+    private readonly string[] _contentKeywords;
+    private readonly Rectangle _buttonRegion;
+    private readonly GeneralOcrOptions _buttonOcrOptions;
+    private readonly Func<IReadOnlyList<GeneralOcrRegion>, Point?> _selectClickPoint;
+    private readonly int _delayBeforeCheckMilliseconds;
+    private readonly int _delayAfterHandleMilliseconds;
+    private readonly int _recheckCount;
+    private readonly string? _manualInterventionReason;
+
+    public OcrPopupStep(
+        string name,
+        Rectangle contentRegion,
+        GeneralOcrOptions contentOcrOptions,
+        IReadOnlyList<string> contentKeywords,
+        Rectangle buttonRegion,
+        GeneralOcrOptions buttonOcrOptions,
+        Func<IReadOnlyList<GeneralOcrRegion>, Point?> selectClickPoint,
+        int delayBeforeCheckMilliseconds = 0,
+        int delayAfterHandleMilliseconds = 0,
+        int recheckCount = 2,
+        string? manualInterventionReason = null)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "OCR 弹窗处理" : name;
+        _contentRegion = contentRegion;
+        _contentOcrOptions = contentOcrOptions ?? throw new ArgumentNullException(nameof(contentOcrOptions));
+        _contentKeywords = contentKeywords?.Where(static x => !string.IsNullOrWhiteSpace(x)).ToArray()
+            ?? throw new ArgumentNullException(nameof(contentKeywords));
+        _buttonRegion = buttonRegion;
+        _buttonOcrOptions = buttonOcrOptions ?? throw new ArgumentNullException(nameof(buttonOcrOptions));
+        _selectClickPoint = selectClickPoint ?? throw new ArgumentNullException(nameof(selectClickPoint));
+        _delayBeforeCheckMilliseconds = Math.Max(0, delayBeforeCheckMilliseconds);
+        _delayAfterHandleMilliseconds = Math.Max(0, delayAfterHandleMilliseconds);
+        _recheckCount = Math.Max(1, recheckCount);
+        _manualInterventionReason = string.IsNullOrWhiteSpace(manualInterventionReason)
+            ? null
+            : manualInterventionReason;
+    }
+
+    public string Name { get; }
+
+    public void Execute(AutomationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var result = TryHandle(context);
+        if (result == OcrPopupHandleResult.Handled || result == OcrPopupHandleResult.NotMatched)
+        {
+            return;
+        }
+
+        if (_manualInterventionReason is not null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] OCR 弹窗命中但未能处理：{Name}，进入人工介入。");
+            context.ExecutionController.WaitForContinue(_manualInterventionReason);
+            return;
+        }
+
+        throw new InvalidOperationException($"{Name} 失败：已识别到目标弹窗，但未能选出安全点击坐标。");
+    }
+
+    public OcrPopupHandleResult TryHandle(AutomationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (_delayBeforeCheckMilliseconds > 0)
+        {
+            Thread.Sleep(_delayBeforeCheckMilliseconds);
+        }
+
+        for (var attempt = 1; attempt <= _recheckCount; attempt++)
+        {
+            var contentResult = ReadOcrResult(context, _contentRegion, _contentOcrOptions);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 弹窗正文 OCR：{contentResult.NormalizedText}，消息：{contentResult.Message}");
+
+            if (!contentResult.Success || !ContainsAllKeywords(contentResult, _contentKeywords))
+            {
+                if (attempt < _recheckCount)
+                {
+                    Thread.Sleep(_delayBeforeCheckMilliseconds > 0 ? _delayBeforeCheckMilliseconds : 300);
+                }
+
+                continue;
+            }
+
+            var buttonResult = ReadOcrResult(context, _buttonRegion, _buttonOcrOptions);
+            var absoluteRegions = buttonResult.SafeRegions
+                .Select(region => OffsetRegion(region, _buttonRegion.X, _buttonRegion.Y))
+                .ToArray();
+
+            var clickPoint = _selectClickPoint(absoluteRegions);
+            if (clickPoint is null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 弹窗正文命中，但 handler 未返回点击坐标。");
+                return OcrPopupHandleResult.MatchedButFailed;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] OCR 弹窗处理点击坐标：({clickPoint.Value.X}, {clickPoint.Value.Y})");
+            context.Mouse.MoveTo(clickPoint.Value.X, clickPoint.Value.Y);
+            context.Mouse.LeftClick(clickPoint.Value.X, clickPoint.Value.Y);
+
+            if (_delayAfterHandleMilliseconds > 0)
+            {
+                Thread.Sleep(_delayAfterHandleMilliseconds);
+            }
+
+            return OcrPopupHandleResult.Handled;
+        }
+
+        return OcrPopupHandleResult.NotMatched;
+    }
+
+    private static GeneralOcrResult ReadOcrResult(
+        AutomationContext context,
+        Rectangle region,
+        GeneralOcrOptions options)
+    {
+        using var source = context.Capture.Capture(region);
+        return context.GeneralOcr.RecognizeRegionsAsync(source, options).GetAwaiter().GetResult();
+    }
+
+    private static bool ContainsAllKeywords(GeneralOcrResult result, IReadOnlyList<string> keywords)
+    {
+        if (keywords.Count == 0)
+        {
+            return true;
+        }
+
+        var normalizedKeywords = keywords
+            .Select(GeneralTextNormalizer.NormalizeText)
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+
+        return normalizedKeywords.Length > 0 &&
+               normalizedKeywords.All(keyword =>
+                   result.NormalizedText.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static GeneralOcrRegion OffsetRegion(GeneralOcrRegion region, int offsetX, int offsetY)
+    {
+        return region with
+        {
+            Bounds = new Rectangle(region.Bounds.X + offsetX, region.Bounds.Y + offsetY, region.Bounds.Width, region.Bounds.Height),
+            Center = new GeneralOcrPoint(region.Center.X + offsetX, region.Center.Y + offsetY)
+        };
+    }
+}
+
+public enum OcrPopupHandleResult
+{
+    NotMatched = 0,
+    Handled = 1,
+    MatchedButFailed = 2,
 }

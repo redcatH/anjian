@@ -31,6 +31,12 @@
     <Compile Update="AmountOcrTestForm.Designer.cs">
       <DependentUpon>AmountOcrTestForm.cs</DependentUpon>
     </Compile>
+    <Compile Update="TextOcrTestForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="TextOcrTestForm.Designer.cs">
+      <DependentUpon>TextOcrTestForm.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>
@@ -42,6 +48,9 @@
     </EmbeddedResource>
     <EmbeddedResource Update="AmountOcrTestForm.resx">
       <DependentUpon>AmountOcrTestForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="TextOcrTestForm.resx">
+      <DependentUpon>TextOcrTestForm.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
 

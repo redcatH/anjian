@@ -169,6 +169,37 @@ public static class CodeSnippetBuilder
         return new CodeSnippetResult("金额识别代码", code, "已包含固定区域截图、预处理参数和金额识别调用。");
     }
 
+    public static CodeSnippetResult BuildTextOcr(Rectangle region, GeneralOcrOptions options)
+    {
+        var code = $$"""
+            var captureService = new ScreenCaptureService();
+            var imagePreprocess = new ImagePreprocessService();
+            var runtimeOptions = new GeneralOcrRuntimeOptions(
+                Provider: OcrEngineType.PaddleSharp,
+                Device: GeneralOcrDeviceType.CpuMkl);
+            var ocrService = GeneralOcrServiceFactory.Create(imagePreprocess, runtimeOptions);
+
+            using var sourceBitmap = captureService.Capture(new Rectangle({{region.X}}, {{region.Y}}, {{region.Width}}, {{region.Height}}));
+            var ocrOptions = new GeneralOcrOptions(
+                {{ToBooleanLiteral(options.UseGrayscale)}},
+                {{ToBooleanLiteral(options.UseBinarization)}},
+                {{options.BinarizationThreshold}},
+                {{ToBooleanLiteral(options.Scale2x)}});
+
+            var result = await ocrService.RecognizeRegionsAsync(sourceBitmap, ocrOptions);
+            if (result.Success)
+            {
+                Console.WriteLine(result.NormalizedText);
+                foreach (var region in result.SafeRegions)
+                {
+                    Console.WriteLine($"{region.Text} @ ({region.Center.X}, {region.Center.Y})");
+                }
+            }
+            """;
+
+        return new CodeSnippetResult("文字识别代码", code, "已包含区域截图、通用 OCR 参数和文字识别调用。");
+    }
+
     private static string EscapePath(string path)
     {
         return Path.GetFullPath(path).Replace("\"", "\"\"");
