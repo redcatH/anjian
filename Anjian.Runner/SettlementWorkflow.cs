@@ -54,6 +54,9 @@ internal sealed class SettlementWorkflow
         var zhRegion = new Rectangle(2178, 5, 60, 800);
         var zhTemplatePath = GetRunnerAssetPath("最后.png");
 
+        var closeButtonRegion = new Rectangle(2580, 320, 60, 60);
+        var closeButtonTemplatePath = GetRunnerAssetPath("关闭按钮.png");
+
         var settlementDialogTextRegion = new Rectangle(2240, 180, 420, 220);
         var settlementDialogTextOcrOptions = new GeneralOcrOptions(
             true,
@@ -88,7 +91,7 @@ internal sealed class SettlementWorkflow
             //     regions => ChoosePopupButtonPoint(regions, "继续", "确定", "是"),
             //     delayAfterHandleMilliseconds: 1000),
         };
-
+        var pdRegion = new Rectangle(2207, 90, 100, 600);
         var steps = new IAutomationStep[]
         {
             new MouseMoveStep(1942, 112),
@@ -102,9 +105,21 @@ internal sealed class SettlementWorkflow
             new TextInputStep(number),
             new DelayStep(500),
             new HotKeyStep(Keys.Enter),
+            new DelayStep(2000),
+            new DelegateStep("检查目标图片，不存在则跳过当前号码", () =>
+            {
+                var result = FindImage(
+                    capture,
+                    matcher,
+                    zhTemplatePath,
+                    zhOptions with { SearchRegion = pdRegion, UseGrayscale = false});
+
+                if (!result.Success || result.Location is null)
+                {
+                    throw new SkipCurrentRunException("未找到目标图片，跳过当前号码。");
+                }
+            }),
             new WaitStep("选择继续或跳过本次。"),
-            new LeftClickStep(2222, -19),
-            new DelayStep(5000),
             new LeftClickStep(2222, -19),
 
             new ConditionalStep(
@@ -198,11 +213,23 @@ internal sealed class SettlementWorkflow
 
                 Console.WriteLine($"金额：{recognizedAmount!.Amount}，来源：手工输入");
             }),
-            //点击关闭按钮
-            new DelayStep(500),
-            new LeftClickStep(2607, 349),
-            new DelayStep(2000),
-
+            //点击关闭按钮（如果存在）
+            new ConditionalStep(
+                "如果关闭按钮存在则点击",
+                _ =>
+                {
+                    var exists = HasImage(capture, matcher, closeButtonRegion, closeButtonTemplatePath);
+                    Console.WriteLine($"关闭按钮：{(exists ? "存在" : "不存在")}");
+                    return exists;
+                },
+                new IAutomationStep[]
+                {
+                    new DelayStep(500),
+                    new LeftClickStep(2607, 349),
+                    new DelayStep(2000),
+                }),
+            new WaitStep("是否继续医保费用,F3继续 F4结束"),
+            //继续第二步骤
             new MouseMoveStep(1943, 16),
             new LeftClickStep(1943, 16),
             new DelayStep(1000),
