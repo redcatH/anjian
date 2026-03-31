@@ -6,16 +6,19 @@ namespace Anjian;
 
 internal sealed class GlobalF3ContinueSignal : IGlobalContinueSignal, IDisposable
 {
-    private const int HotKeyId = 9001;
+    private const int ContinueHotKeyId = 9001;
+    private const int SkipHotKeyId = 9002;
     private const uint VkF3 = 0x72;
+    private const uint VkF4 = 0x73;
     private const uint ModNoRepeat = 0x4000;
     private const uint WmHotKey = 0x0312;
     private const uint WmQuit = 0x0012;
 
-    private readonly AutoResetEvent _continueEvent = new(false);
+    private readonly AutoResetEvent _decisionEvent = new(false);
     private readonly ManualResetEventSlim _readyEvent = new(false);
     private readonly Thread _messageThread;
     private volatile bool _isWaiting;
+    private volatile ContinueDecision _decision = ContinueDecision.Continue;
     private uint _threadId;
     private bool _disposed;
     private Exception? _startupException;
@@ -36,14 +39,32 @@ internal sealed class GlobalF3ContinueSignal : IGlobalContinueSignal, IDisposabl
         }
     }
 
-    public void WaitForF3(string reason)
+    public ContinueDecision WaitForContinueDecision(string reason, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _ = reason;
 
         _isWaiting = true;
-        _continueEvent.WaitOne();
-        _isWaiting = false;
+        try
+        {
+            if (!cancellationToken.CanBeCanceled)
+            {
+                _decisionEvent.WaitOne();
+                return _decision;
+            }
+
+            var signaledIndex = WaitHandle.WaitAny(new[] { _decisionEvent, cancellationToken.WaitHandle });
+            if (signaledIndex == 1)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            return _decision;
+        }
+        finally
+        {
+            _isWaiting = false;
+        }
     }
 
     public void Dispose()
@@ -61,7 +82,7 @@ internal sealed class GlobalF3ContinueSignal : IGlobalContinueSignal, IDisposabl
         }
 
         _messageThread.Join();
-        _continueEvent.Dispose();
+        _decisionEvent.Dispose();
         _readyEvent.Dispose();
     }
 
@@ -72,18 +93,36 @@ internal sealed class GlobalF3ContinueSignal : IGlobalContinueSignal, IDisposabl
             _threadId = GetCurrentThreadId();
             PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
 
-            if (!RegisterHotKey(IntPtr.Zero, HotKeyId, ModNoRepeat, VkF3))
+            if (!RegisterHotKey(IntPtr.Zero, ContinueHotKeyId, ModNoRepeat, VkF3))
             {
-                throw new InvalidOperationException($"RegisterHotKey 失败，Win32Error={Marshal.GetLastWin32Error()}");
+                throw new InvalidOperationException($"注册全局 F3 热键失败，Win32Error={Marshal.GetLastWin32Error()}");
+            }
+
+            if (!RegisterHotKey(IntPtr.Zero, SkipHotKeyId, ModNoRepeat, VkF4))
+            {
+                throw new InvalidOperationException($"注册全局 F4 热键失败，Win32Error={Marshal.GetLastWin32Error()}");
             }
 
             _readyEvent.Set();
 
             while (GetMessage(out var message, IntPtr.Zero, 0, 0) > 0)
             {
-                if (message.message == WmHotKey && message.wParam == (UIntPtr)HotKeyId && _isWaiting)
+                if (message.message != WmHotKey || !_isWaiting)
                 {
-                    _continueEvent.Set();
+                    continue;
+                }
+
+                if (message.wParam == (UIntPtr)ContinueHotKeyId)
+                {
+                    _decision = ContinueDecision.Continue;
+                    _decisionEvent.Set();
+                    continue;
+                }
+
+                if (message.wParam == (UIntPtr)SkipHotKeyId)
+                {
+                    _decision = ContinueDecision.SkipCurrentRun;
+                    _decisionEvent.Set();
                 }
             }
         }
@@ -96,7 +135,8 @@ internal sealed class GlobalF3ContinueSignal : IGlobalContinueSignal, IDisposabl
         {
             if (_threadId != 0)
             {
-                UnregisterHotKey(IntPtr.Zero, HotKeyId);
+                UnregisterHotKey(IntPtr.Zero, ContinueHotKeyId);
+                UnregisterHotKey(IntPtr.Zero, SkipHotKeyId);
             }
         }
     }

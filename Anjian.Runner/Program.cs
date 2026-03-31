@@ -13,7 +13,7 @@ internal static class Program
         Console.OutputEncoding = Encoding.UTF8;
         Console.WriteLine("Anjian.Runner 已启动。");
         Console.WriteLine($"当前执行模式：{GetModeText(mode)}");
-        Console.WriteLine("调试控制：全局按 F3 继续。");
+        Console.WriteLine("调试控制：全局按 F3 继续，按 F4 跳过当前号码。");
 
         var mouse = new Win32MouseService();
         var matcher = new TemplateMatcher();

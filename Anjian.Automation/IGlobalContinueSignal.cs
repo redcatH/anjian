@@ -1,6 +1,14 @@
 namespace Anjian;
 
+using System.Threading;
+
+public enum ContinueDecision
+{
+    Continue,
+    SkipCurrentRun
+}
+
 public interface IGlobalContinueSignal
 {
-    void WaitForF3(string reason);
+    ContinueDecision WaitForContinueDecision(string reason, CancellationToken cancellationToken = default);
 }
