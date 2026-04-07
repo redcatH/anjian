@@ -44,6 +44,7 @@ public sealed partial class MainForm
     private Button btnOpenImageMatch = null!;
     private Button btnOpenAmountOcr = null!;
     private Button btnOpenTextOcr = null!;
+    private Button btnOpenPdfTableValue = null!;
     private GroupBox grpKeyboardTools = null!;
     private TableLayoutPanel keyboardToolLayout = null!;
     private Label lblKeyboardModeTitle = null!;
@@ -108,6 +109,7 @@ public sealed partial class MainForm
         centerCard = new Panel();
         centerStack = new TableLayoutPanel();
         grpToolEntrance = new GroupBox();
+        btnOpenPdfTableValue = new Button();
         btnOpenTextOcr = new Button();
         btnOpenAmountOcr = new Button();
         btnOpenImageMatch = new Button();
@@ -580,7 +582,7 @@ public sealed partial class MainForm
         centerStack.Location = new Point(14, 14);
         centerStack.Name = "centerStack";
         centerStack.RowCount = 4;
-        centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 204F));
+        centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 244F));
         centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 340F));
         centerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 164F));
         centerStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -589,6 +591,7 @@ public sealed partial class MainForm
         // 
         // grpToolEntrance
         // 
+        grpToolEntrance.Controls.Add(btnOpenPdfTableValue);
         grpToolEntrance.Controls.Add(btnOpenTextOcr);
         grpToolEntrance.Controls.Add(btnOpenAmountOcr);
         grpToolEntrance.Controls.Add(btnOpenImageMatch);
@@ -597,10 +600,21 @@ public sealed partial class MainForm
         grpToolEntrance.Margin = new Padding(0);
         grpToolEntrance.Name = "grpToolEntrance";
         grpToolEntrance.Padding = new Padding(10);
-        grpToolEntrance.Size = new Size(280, 204);
+        grpToolEntrance.Size = new Size(280, 244);
         grpToolEntrance.TabIndex = 0;
         grpToolEntrance.TabStop = false;
         grpToolEntrance.Text = "调试工具";
+        // 
+        // btnOpenPdfTableValue
+        // 
+        btnOpenPdfTableValue.Dock = DockStyle.Top;
+        btnOpenPdfTableValue.Location = new Point(10, 146);
+        btnOpenPdfTableValue.Name = "btnOpenPdfTableValue";
+        btnOpenPdfTableValue.Size = new Size(260, 40);
+        btnOpenPdfTableValue.TabIndex = 3;
+        btnOpenPdfTableValue.Text = "PDF 表格取值测试";
+        btnOpenPdfTableValue.UseVisualStyleBackColor = true;
+        btnOpenPdfTableValue.Click += btnOpenPdfTableValue_Click;
         // 
         // btnOpenTextOcr
         // 

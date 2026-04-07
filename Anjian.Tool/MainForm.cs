@@ -393,6 +393,12 @@ public sealed partial class MainForm : Form
         form.ShowDialog(this);
     }
 
+    private void btnOpenPdfTableValue_Click(object? sender, EventArgs e)
+    {
+        using var form = new PdfTableValueTestForm();
+        form.ShowDialog(this);
+    }
+
     private void btnCopySnippet_Click(object? sender, EventArgs e)
     {
         Clipboard.SetText(txtSnippet.Text);

@@ -18,7 +18,6 @@ public static class CodeSnippetBuilder
     public static CodeSnippetResult BuildRectangleDeclaration(string variableName, Rectangle region)
     {
         var code = FormatRectangleDeclaration(variableName, region);
-
         return new CodeSnippetResult("区域定义代码", code, "生成可直接用于截图、找图或 OCR 的 Rectangle 定义。");
     }
 
@@ -211,6 +210,26 @@ public static class CodeSnippetBuilder
             """;
 
         return new CodeSnippetResult("文字识别代码", code, "已包含区域截图、通用 OCR 参数和文字识别调用。");
+    }
+
+    public static CodeSnippetResult BuildTableOcrAsJson(Rectangle region)
+    {
+        var code = $$"""
+            var captureService = new ScreenCaptureService();
+            var runtimeOptions = new GeneralOcrRuntimeOptions(
+                Provider: OcrEngineType.PaddleSharp,
+                Device: GeneralOcrDeviceType.CpuMkl);
+            var tableOcrService = new PaddleSharpTableOcrService(runtimeOptions);
+
+            using var sourceBitmap = captureService.Capture(new Rectangle({{region.X}}, {{region.Y}}, {{region.Width}}, {{region.Height}}));
+            var result = await tableOcrService.RecognizeTableAsJsonAsync(sourceBitmap);
+            if (result.Success)
+            {
+                Console.WriteLine(result.Json);
+            }
+            """;
+
+        return new CodeSnippetResult("表格识别 JSON 代码", code, "已包含区域截图和 Paddle 表格识别，可直接输出 JSON。");
     }
 
     private static string EscapePath(string path)

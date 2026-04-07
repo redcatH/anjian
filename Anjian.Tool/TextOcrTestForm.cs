@@ -13,6 +13,7 @@ public sealed partial class TextOcrTestForm : Form
     private readonly ScreenCaptureService _screenCaptureService = new();
     private readonly ImagePreprocessService _imagePreprocessService = new();
     private readonly IGeneralOcrService _generalOcrService;
+    private readonly ITableOcrService _tableOcrService;
     private readonly GeneralOcrRuntimeOptions _generalOcrRuntimeOptions;
 
     private Bitmap? _capturedBitmap;
@@ -26,6 +27,7 @@ public sealed partial class TextOcrTestForm : Form
             Provider: OcrEngineType.PaddleSharp,
             Device: GeneralOcrDeviceType.CpuMkl);
         _generalOcrService = GeneralOcrServiceFactory.Create(_imagePreprocessService, _generalOcrRuntimeOptions);
+        _tableOcrService = new PaddleSharpTableOcrService(_generalOcrRuntimeOptions);
 
         InitializeComponent();
         SetDefaultRegion();
@@ -39,6 +41,16 @@ public sealed partial class TextOcrTestForm : Form
             _capturedBitmap?.Dispose();
             _sourcePreviewBitmap?.Dispose();
             _processedBitmap?.Dispose();
+
+            if (_generalOcrService is IDisposable generalDisposable)
+            {
+                generalDisposable.Dispose();
+            }
+
+            if (_tableOcrService is IDisposable tableDisposable)
+            {
+                tableDisposable.Dispose();
+            }
         }
 
         base.Dispose(disposing);
@@ -91,28 +103,61 @@ public sealed partial class TextOcrTestForm : Form
 
         try
         {
-            if (_capturedBitmap is null)
-            {
-                ReplaceCapturedBitmap(_screenCaptureService.Capture(region));
-                ReplaceSourcePreview(new Bitmap(_capturedBitmap!));
-                AppendLog("未检测到截图内容，已在识别前自动截图。");
-            }
+            EnsureCapturedBitmap(region);
 
             _lastOptions = options;
             ReplaceProcessedBitmap(_imagePreprocessService.Preprocess(new Bitmap(_capturedBitmap!), options));
-            AppendLog($"开始文字识别。灰度={options.UseGrayscale}，二值化={options.UseBinarization}，阈值={options.BinarizationThreshold}，放大2x={options.Scale2x}。");
+            AppendLog($"开始文字识别。灰度={options.UseGrayscale}，二值化={options.UseBinarization}，阈值={options.BinarizationThreshold}，放大 2x={options.Scale2x}");
 
-            var result = await _generalOcrService.RecognizeRegionsAsync(new Bitmap(_capturedBitmap!), options);
+            using var bitmap = new Bitmap(_capturedBitmap!);
+            var result = await _generalOcrService.RecognizeRegionsAsync(bitmap, options);
             UpdateResult(result);
             ReplaceSourcePreview(RenderOverlay(_capturedBitmap!, result.SafeRegions));
             AppendRegionLog(result.SafeRegions);
-            AppendLog($"识别完成。状态={result.Success}，耗时={result.ElapsedMilliseconds} ms，消息={result.Message}");
+            AppendLog($"文字识别完成。状态={result.Success}，耗时={result.ElapsedMilliseconds} ms，消息={result.Message}");
             GenerateSnippet(false);
         }
         catch (Exception ex)
         {
             ShowError($"文字识别失败：{ex.Message}");
         }
+    }
+
+    private async Task ExecuteTableOcrAsync()
+    {
+        if (!TryReadRegion(out var region))
+        {
+            return;
+        }
+
+        try
+        {
+            EnsureCapturedBitmap(region);
+
+            AppendLog($"开始表格识别。区域：X={region.X}, Y={region.Y}, W={region.Width}, H={region.Height}");
+            using var bitmap = new Bitmap(_capturedBitmap!);
+            var result = await _tableOcrService.RecognizeTableAsJsonAsync(bitmap);
+            UpdateTableResult(result);
+            txtSnippet.Text = BuildSnippetText(CodeSnippetBuilder.BuildTableOcrAsJson(region));
+            AppendLog($"表格识别完成。状态={result.Success}，耗时={result.ElapsedMilliseconds} ms，消息={result.Message}");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"表格识别失败：{ex.Message}");
+        }
+    }
+
+    private void EnsureCapturedBitmap(Rectangle region)
+    {
+        if (_capturedBitmap is not null)
+        {
+            return;
+        }
+
+        ReplaceCapturedBitmap(_screenCaptureService.Capture(region));
+        ReplaceSourcePreview(new Bitmap(_capturedBitmap!));
+        RefreshProcessedPreview();
+        AppendLog("未检测到截图内容，已在识别前自动截图。");
     }
 
     private void GenerateSnippet(bool appendLog)
@@ -143,15 +188,19 @@ public sealed partial class TextOcrTestForm : Form
             options = currentOptions;
         }
 
-        var snippet = CodeSnippetBuilder.BuildTextOcr(region, options);
-        txtSnippet.Text = snippet.Description is null
-            ? snippet.Code
-            : $"// {snippet.Description}{Environment.NewLine}{snippet.Code}";
+        txtSnippet.Text = BuildSnippetText(CodeSnippetBuilder.BuildTextOcr(region, options));
 
         if (appendLog)
         {
             AppendLog("已生成文字识别 C# 代码。");
         }
+    }
+
+    private static string BuildSnippetText(CodeSnippetResult snippet)
+    {
+        return snippet.Description is null
+            ? snippet.Code
+            : $"// {snippet.Description}{Environment.NewLine}{snippet.Code}";
     }
 
     private bool TryReadRegion(out Rectangle region)
@@ -310,8 +359,7 @@ public sealed partial class TextOcrTestForm : Form
         for (var i = 0; i < regions.Count; i++)
         {
             var region = regions[i];
-            AppendLog(
-                $"Region {i + 1}: 文本={region.Text}, 分数={region.Score.ToString("0.00", CultureInfo.InvariantCulture)}, 中心=({region.Center.X:0.##}, {region.Center.Y:0.##}), 边界=({region.Bounds.X}, {region.Bounds.Y}, {region.Bounds.Width}, {region.Bounds.Height})");
+            AppendLog($"Region {i + 1}: 文本={region.Text}, 分数={region.Score.ToString("0.00", CultureInfo.InvariantCulture)}, 中心=({region.Center.X:0.##}, {region.Center.Y:0.##}), 边界=({region.Bounds.X}, {region.Bounds.Y}, {region.Bounds.Width}, {region.Bounds.Height})");
         }
     }
 
@@ -324,6 +372,14 @@ public sealed partial class TextOcrTestForm : Form
         txtNormalized.Text = result.NormalizedText;
     }
 
+    private void UpdateTableResult(TableOcrResult result)
+    {
+        lblStatusValue.Text = result.Success ? "成功" : "失败";
+        lblElapsedValue.Text = result.ElapsedMilliseconds.ToString();
+        lblMessageValue.Text = result.Message;
+        txtTableJson.Text = result.Json;
+    }
+
     private void ResetResult()
     {
         lblStatusValue.Text = "-";
@@ -331,6 +387,7 @@ public sealed partial class TextOcrTestForm : Form
         lblMessageValue.Text = "-";
         txtRaw.Clear();
         txtNormalized.Clear();
+        txtTableJson.Clear();
     }
 
     private void AppendLog(string message)
@@ -350,6 +407,8 @@ public sealed partial class TextOcrTestForm : Form
 
     private async void btnExecuteOcr_Click(object? sender, EventArgs e) => await ExecuteOcrAsync();
 
+    private async void btnExecuteTableJson_Click(object? sender, EventArgs e) => await ExecuteTableOcrAsync();
+
     private void btnGenerateSnippet_Click(object? sender, EventArgs e) => GenerateSnippet(true);
 
     private void btnCopySnippet_Click(object? sender, EventArgs e)
@@ -363,6 +422,12 @@ public sealed partial class TextOcrTestForm : Form
         var text = string.IsNullOrWhiteSpace(txtNormalized.Text) ? txtRaw.Text : txtNormalized.Text;
         Clipboard.SetText(text);
         AppendLog("识别文本已复制到剪贴板。");
+    }
+
+    private void btnCopyTableJson_Click(object? sender, EventArgs e)
+    {
+        Clipboard.SetText(txtTableJson.Text);
+        AppendLog("表格 JSON 已复制到剪贴板。");
     }
 
     private void chkOptions_CheckedChanged(object? sender, EventArgs e) => RefreshProcessedPreview();

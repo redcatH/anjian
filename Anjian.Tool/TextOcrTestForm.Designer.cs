@@ -14,11 +14,13 @@ public sealed partial class TextOcrTestForm
     private GroupBox grpResult = null!;
     private GroupBox grpRaw = null!;
     private GroupBox grpNormalized = null!;
+    private GroupBox grpTableJson = null!;
     private TableLayoutPanel regionLayout = null!;
     private TableLayoutPanel optionsLayout = null!;
     private TableLayoutPanel actionLayout = null!;
     private TableLayoutPanel resultLayout = null!;
     private TableLayoutPanel snippetActions = null!;
+    private TableLayoutPanel tableJsonLayout = null!;
     private Label lblRegionX = null!;
     private Label lblRegionY = null!;
     private Label lblRegionWidth = null!;
@@ -41,6 +43,7 @@ public sealed partial class TextOcrTestForm
     private TextBox txtNormalized = null!;
     private TextBox txtSnippet = null!;
     private TextBox txtLog = null!;
+    private TextBox txtTableJson = null!;
     private CheckBox chkGrayscale = null!;
     private CheckBox chkBinarization = null!;
     private CheckBox chkScale2x = null!;
@@ -52,9 +55,11 @@ public sealed partial class TextOcrTestForm
     private Button btnCaptureRegion = null!;
     private Button btnPickRegion = null!;
     private Button btnExecuteOcr = null!;
+    private Button btnExecuteTableJson = null!;
     private Button btnGenerateSnippet = null!;
     private Button btnCopySnippet = null!;
     private Button btnCopyText = null!;
+    private Button btnCopyTableJson = null!;
 
     private void InitializeComponent()
     {
@@ -70,6 +75,7 @@ public sealed partial class TextOcrTestForm
         txtRegionWidth = new TextBox();
         lblRegionHeight = new Label();
         txtRegionHeight = new TextBox();
+        btnPickRegion = new Button();
         grpOptions = new GroupBox();
         optionsLayout = new TableLayoutPanel();
         chkGrayscale = new CheckBox();
@@ -78,9 +84,9 @@ public sealed partial class TextOcrTestForm
         lblThreshold = new Label();
         txtThreshold = new TextBox();
         actionLayout = new TableLayoutPanel();
-        btnPickRegion = new Button();
         btnCaptureRegion = new Button();
         btnExecuteOcr = new Button();
+        btnExecuteTableJson = new Button();
         btnGenerateSnippet = new Button();
         btnCopyText = new Button();
         lblHint = new Label();
@@ -106,6 +112,10 @@ public sealed partial class TextOcrTestForm
         txtRaw = new TextBox();
         grpNormalized = new GroupBox();
         txtNormalized = new TextBox();
+        grpTableJson = new GroupBox();
+        tableJsonLayout = new TableLayoutPanel();
+        btnCopyTableJson = new Button();
+        txtTableJson = new TextBox();
         lblLogSection = new Label();
         txtLog = new TextBox();
         rootLayout.SuspendLayout();
@@ -124,10 +134,9 @@ public sealed partial class TextOcrTestForm
         snippetActions.SuspendLayout();
         grpRaw.SuspendLayout();
         grpNormalized.SuspendLayout();
+        grpTableJson.SuspendLayout();
+        tableJsonLayout.SuspendLayout();
         SuspendLayout();
-        //
-        // rootLayout
-        //
         rootLayout.ColumnCount = 3;
         rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 330F));
         rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -143,9 +152,6 @@ public sealed partial class TextOcrTestForm
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         rootLayout.Size = new Size(1600, 920);
         rootLayout.TabIndex = 0;
-        //
-        // leftPanel
-        //
         leftPanel.ColumnCount = 1;
         leftPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         leftPanel.Controls.Add(grpRegion, 0, 0);
@@ -158,13 +164,10 @@ public sealed partial class TextOcrTestForm
         leftPanel.RowCount = 4;
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 220F));
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 200F));
-        leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 176F));
+        leftPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 210F));
         leftPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         leftPanel.Size = new Size(324, 890);
         leftPanel.TabIndex = 0;
-        //
-        // grpRegion
-        //
         grpRegion.Controls.Add(regionLayout);
         grpRegion.Dock = DockStyle.Fill;
         grpRegion.Location = new Point(3, 3);
@@ -174,9 +177,6 @@ public sealed partial class TextOcrTestForm
         grpRegion.TabIndex = 0;
         grpRegion.TabStop = false;
         grpRegion.Text = "识别区域";
-        //
-        // regionLayout
-        //
         regionLayout.ColumnCount = 2;
         regionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
         regionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -198,16 +198,14 @@ public sealed partial class TextOcrTestForm
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
         regionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
-        regionLayout.Size = new Size(298, 138);
+        regionLayout.Size = new Size(298, 178);
         regionLayout.TabIndex = 0;
-        //
-        // region labels/textboxes
-        //
         lblRegionX.Dock = DockStyle.Fill;
         lblRegionX.Location = new Point(3, 0);
         lblRegionX.Name = "lblRegionX";
         lblRegionX.Size = new Size(90, 34);
         lblRegionX.Text = "X";
+        lblRegionX.TextAlign = ContentAlignment.MiddleLeft;
         txtRegionX.Dock = DockStyle.Fill;
         txtRegionX.Location = new Point(99, 3);
         txtRegionX.Name = "txtRegionX";
@@ -217,6 +215,7 @@ public sealed partial class TextOcrTestForm
         lblRegionY.Name = "lblRegionY";
         lblRegionY.Size = new Size(90, 34);
         lblRegionY.Text = "Y";
+        lblRegionY.TextAlign = ContentAlignment.MiddleLeft;
         txtRegionY.Dock = DockStyle.Fill;
         txtRegionY.Location = new Point(99, 37);
         txtRegionY.Name = "txtRegionY";
@@ -226,6 +225,7 @@ public sealed partial class TextOcrTestForm
         lblRegionWidth.Name = "lblRegionWidth";
         lblRegionWidth.Size = new Size(90, 34);
         lblRegionWidth.Text = "Width";
+        lblRegionWidth.TextAlign = ContentAlignment.MiddleLeft;
         txtRegionWidth.Dock = DockStyle.Fill;
         txtRegionWidth.Location = new Point(99, 71);
         txtRegionWidth.Name = "txtRegionWidth";
@@ -233,39 +233,31 @@ public sealed partial class TextOcrTestForm
         lblRegionHeight.Dock = DockStyle.Fill;
         lblRegionHeight.Location = new Point(3, 102);
         lblRegionHeight.Name = "lblRegionHeight";
-        lblRegionHeight.Size = new Size(90, 36);
+        lblRegionHeight.Size = new Size(90, 34);
         lblRegionHeight.Text = "Height";
+        lblRegionHeight.TextAlign = ContentAlignment.MiddleLeft;
         txtRegionHeight.Dock = DockStyle.Fill;
         txtRegionHeight.Location = new Point(99, 105);
         txtRegionHeight.Name = "txtRegionHeight";
         txtRegionHeight.Size = new Size(196, 23);
-        //
-        // btnPickRegion
-        //
         btnPickRegion.Dock = DockStyle.Fill;
         btnPickRegion.Location = new Point(3, 139);
         btnPickRegion.Name = "btnPickRegion";
-        btnPickRegion.Size = new Size(292, 34);
+        btnPickRegion.Size = new Size(292, 36);
         btnPickRegion.TabIndex = 8;
         btnPickRegion.Text = "选取区域";
         btnPickRegion.UseVisualStyleBackColor = true;
         btnPickRegion.Click += btnPickRegion_Click;
         regionLayout.SetColumnSpan(btnPickRegion, 2);
-        //
-        // grpOptions
-        //
         grpOptions.Controls.Add(optionsLayout);
         grpOptions.Dock = DockStyle.Fill;
-        grpOptions.Location = new Point(3, 183);
+        grpOptions.Location = new Point(3, 223);
         grpOptions.Name = "grpOptions";
         grpOptions.Padding = new Padding(10);
         grpOptions.Size = new Size(318, 194);
         grpOptions.TabIndex = 1;
         grpOptions.TabStop = false;
         grpOptions.Text = "OCR 参数";
-        //
-        // optionsLayout
-        //
         optionsLayout.ColumnCount = 2;
         optionsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
         optionsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -309,71 +301,72 @@ public sealed partial class TextOcrTestForm
         lblThreshold.Name = "lblThreshold";
         lblThreshold.Size = new Size(90, 56);
         lblThreshold.Text = "二值化阈值";
+        lblThreshold.TextAlign = ContentAlignment.MiddleLeft;
         txtThreshold.Dock = DockStyle.Fill;
         txtThreshold.Location = new Point(99, 105);
         txtThreshold.Name = "txtThreshold";
         txtThreshold.Size = new Size(196, 23);
         txtThreshold.Text = "160";
         txtThreshold.TextChanged += txtThreshold_TextChanged;
-        //
-        // actionLayout
-        //
         actionLayout.ColumnCount = 1;
         actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         actionLayout.Controls.Add(btnCaptureRegion, 0, 0);
         actionLayout.Controls.Add(btnExecuteOcr, 0, 1);
-        actionLayout.Controls.Add(btnGenerateSnippet, 0, 2);
-        actionLayout.Controls.Add(btnCopyText, 0, 3);
+        actionLayout.Controls.Add(btnExecuteTableJson, 0, 2);
+        actionLayout.Controls.Add(btnGenerateSnippet, 0, 3);
+        actionLayout.Controls.Add(btnCopyText, 0, 4);
         actionLayout.Dock = DockStyle.Fill;
-        actionLayout.Location = new Point(3, 383);
+        actionLayout.Location = new Point(3, 423);
         actionLayout.Name = "actionLayout";
-        actionLayout.RowCount = 4;
-        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-        actionLayout.Size = new Size(318, 170);
+        actionLayout.RowCount = 5;
+        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        actionLayout.Size = new Size(318, 204);
         actionLayout.TabIndex = 2;
         btnCaptureRegion.Dock = DockStyle.Fill;
         btnCaptureRegion.Location = new Point(3, 3);
         btnCaptureRegion.Name = "btnCaptureRegion";
-        btnCaptureRegion.Size = new Size(312, 36);
+        btnCaptureRegion.Size = new Size(312, 34);
         btnCaptureRegion.Text = "截图当前区域";
         btnCaptureRegion.UseVisualStyleBackColor = true;
         btnCaptureRegion.Click += btnCaptureRegion_Click;
         btnExecuteOcr.Dock = DockStyle.Fill;
-        btnExecuteOcr.Location = new Point(3, 45);
+        btnExecuteOcr.Location = new Point(3, 43);
         btnExecuteOcr.Name = "btnExecuteOcr";
-        btnExecuteOcr.Size = new Size(312, 36);
+        btnExecuteOcr.Size = new Size(312, 34);
         btnExecuteOcr.Text = "识别当前区域";
         btnExecuteOcr.UseVisualStyleBackColor = true;
         btnExecuteOcr.Click += btnExecuteOcr_Click;
+        btnExecuteTableJson.Dock = DockStyle.Fill;
+        btnExecuteTableJson.Location = new Point(3, 83);
+        btnExecuteTableJson.Name = "btnExecuteTableJson";
+        btnExecuteTableJson.Size = new Size(312, 34);
+        btnExecuteTableJson.Text = "识别当前区域为 JSON";
+        btnExecuteTableJson.UseVisualStyleBackColor = true;
+        btnExecuteTableJson.Click += btnExecuteTableJson_Click;
         btnGenerateSnippet.Dock = DockStyle.Fill;
-        btnGenerateSnippet.Location = new Point(3, 87);
+        btnGenerateSnippet.Location = new Point(3, 123);
         btnGenerateSnippet.Name = "btnGenerateSnippet";
-        btnGenerateSnippet.Size = new Size(312, 36);
+        btnGenerateSnippet.Size = new Size(312, 34);
         btnGenerateSnippet.Text = "生成代码片段";
         btnGenerateSnippet.UseVisualStyleBackColor = true;
         btnGenerateSnippet.Click += btnGenerateSnippet_Click;
         btnCopyText.Dock = DockStyle.Fill;
-        btnCopyText.Location = new Point(3, 129);
+        btnCopyText.Location = new Point(3, 163);
         btnCopyText.Name = "btnCopyText";
         btnCopyText.Size = new Size(312, 38);
         btnCopyText.Text = "复制识别文本";
         btnCopyText.UseVisualStyleBackColor = true;
         btnCopyText.Click += btnCopyText_Click;
-        //
-        // lblHint
-        //
         lblHint.Dock = DockStyle.Fill;
         lblHint.ForeColor = Color.DimGray;
-        lblHint.Location = new Point(3, 556);
+        lblHint.Location = new Point(3, 630);
         lblHint.Name = "lblHint";
-        lblHint.Size = new Size(318, 334);
-        lblHint.Text = "建议先截图预览，再逐项调节 OCR 参数。代码片段会同步输出当前区域和参数，便于直接复制到自动化工程。";
-        //
-        // previewPanel
-        //
+        lblHint.Size = new Size(318, 260);
+        lblHint.Text = "建议先截图预览，再逐项调节 OCR 参数。普通文字识别会在原图上叠加文字框；表格识别会把当前区域输出为 JSON，方便直接复制到自动化工程里验证。";
         previewPanel.ColumnCount = 1;
         previewPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         previewPanel.Controls.Add(lblSourceTitle, 0, 0);
@@ -396,12 +389,7 @@ public sealed partial class TextOcrTestForm
         lblSourceTitle.Name = "lblSourceTitle";
         lblSourceTitle.Size = new Size(844, 28);
         lblSourceTitle.Text = "原始截图";
-        lblProcessedTitle.Dock = DockStyle.Fill;
-        lblProcessedTitle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-        lblProcessedTitle.Location = new Point(3, 459);
-        lblProcessedTitle.Name = "lblProcessedTitle";
-        lblProcessedTitle.Size = new Size(844, 28);
-        lblProcessedTitle.Text = "预处理预览";
+        lblSourceTitle.TextAlign = ContentAlignment.MiddleLeft;
         picSource.BackColor = Color.WhiteSmoke;
         picSource.BorderStyle = BorderStyle.FixedSingle;
         picSource.Dock = DockStyle.Fill;
@@ -409,6 +397,13 @@ public sealed partial class TextOcrTestForm
         picSource.Name = "picSource";
         picSource.Size = new Size(844, 425);
         picSource.SizeMode = PictureBoxSizeMode.Zoom;
+        lblProcessedTitle.Dock = DockStyle.Fill;
+        lblProcessedTitle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+        lblProcessedTitle.Location = new Point(3, 459);
+        lblProcessedTitle.Name = "lblProcessedTitle";
+        lblProcessedTitle.Size = new Size(844, 28);
+        lblProcessedTitle.Text = "预处理预览";
+        lblProcessedTitle.TextAlign = ContentAlignment.MiddleLeft;
         picProcessed.BackColor = Color.WhiteSmoke;
         picProcessed.BorderStyle = BorderStyle.FixedSingle;
         picProcessed.Dock = DockStyle.Fill;
@@ -416,9 +411,6 @@ public sealed partial class TextOcrTestForm
         picProcessed.Name = "picProcessed";
         picProcessed.Size = new Size(844, 397);
         picProcessed.SizeMode = PictureBoxSizeMode.Zoom;
-        //
-        // rightPanel
-        //
         rightPanel.ColumnCount = 1;
         rightPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         rightPanel.Controls.Add(grpResult, 0, 0);
@@ -427,25 +419,24 @@ public sealed partial class TextOcrTestForm
         rightPanel.Controls.Add(txtSnippet, 0, 3);
         rightPanel.Controls.Add(grpRaw, 0, 4);
         rightPanel.Controls.Add(grpNormalized, 0, 5);
-        rightPanel.Controls.Add(lblLogSection, 0, 6);
-        rightPanel.Controls.Add(txtLog, 0, 7);
+        rightPanel.Controls.Add(grpTableJson, 0, 6);
+        rightPanel.Controls.Add(lblLogSection, 0, 7);
+        rightPanel.Controls.Add(txtLog, 0, 8);
         rightPanel.Dock = DockStyle.Fill;
         rightPanel.Location = new Point(1201, 15);
         rightPanel.Name = "rightPanel";
-        rightPanel.RowCount = 8;
+        rightPanel.RowCount = 9;
         rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 130F));
         rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
         rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 170F));
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 140F));
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 140F));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 180F));
         rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
         rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         rightPanel.Size = new Size(384, 890);
         rightPanel.TabIndex = 2;
-        //
-        // grpResult
-        //
         grpResult.Controls.Add(resultLayout);
         grpResult.Dock = DockStyle.Fill;
         grpResult.Location = new Point(3, 3);
@@ -477,40 +468,43 @@ public sealed partial class TextOcrTestForm
         lblResultStatus.Name = "lblResultStatus";
         lblResultStatus.Size = new Size(66, 28);
         lblResultStatus.Text = "状态";
+        lblResultStatus.TextAlign = ContentAlignment.MiddleLeft;
         lblStatusValue.Dock = DockStyle.Fill;
         lblStatusValue.Location = new Point(75, 0);
         lblStatusValue.Name = "lblStatusValue";
         lblStatusValue.Size = new Size(280, 28);
         lblStatusValue.Text = "-";
+        lblStatusValue.TextAlign = ContentAlignment.MiddleLeft;
         lblResultElapsed.Dock = DockStyle.Fill;
         lblResultElapsed.Location = new Point(3, 28);
         lblResultElapsed.Name = "lblResultElapsed";
         lblResultElapsed.Size = new Size(66, 28);
         lblResultElapsed.Text = "耗时(ms)";
+        lblResultElapsed.TextAlign = ContentAlignment.MiddleLeft;
         lblElapsedValue.Dock = DockStyle.Fill;
         lblElapsedValue.Location = new Point(75, 28);
         lblElapsedValue.Name = "lblElapsedValue";
         lblElapsedValue.Size = new Size(280, 28);
         lblElapsedValue.Text = "-";
+        lblElapsedValue.TextAlign = ContentAlignment.MiddleLeft;
         lblResultMessage.Dock = DockStyle.Fill;
         lblResultMessage.Location = new Point(3, 56);
         lblResultMessage.Name = "lblResultMessage";
         lblResultMessage.Size = new Size(66, 32);
         lblResultMessage.Text = "消息";
+        lblResultMessage.TextAlign = ContentAlignment.TopLeft;
         lblMessageValue.Dock = DockStyle.Fill;
         lblMessageValue.Location = new Point(75, 56);
         lblMessageValue.Name = "lblMessageValue";
         lblMessageValue.Size = new Size(280, 32);
         lblMessageValue.Text = "-";
-        //
-        // snippet
-        //
         lblSnippetSection.Dock = DockStyle.Fill;
         lblSnippetSection.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
         lblSnippetSection.Location = new Point(3, 130);
         lblSnippetSection.Name = "lblSnippetSection";
         lblSnippetSection.Size = new Size(378, 26);
         lblSnippetSection.Text = "代码片段";
+        lblSnippetSection.TextAlign = ContentAlignment.MiddleLeft;
         snippetActions.ColumnCount = 1;
         snippetActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         snippetActions.Controls.Add(btnCopySnippet, 0, 0);
@@ -534,16 +528,13 @@ public sealed partial class TextOcrTestForm
         txtSnippet.Name = "txtSnippet";
         txtSnippet.ReadOnly = true;
         txtSnippet.ScrollBars = ScrollBars.Both;
-        txtSnippet.Size = new Size(378, 164);
-        //
-        // raw / normalized
-        //
+        txtSnippet.Size = new Size(378, 144);
         grpRaw.Controls.Add(txtRaw);
         grpRaw.Dock = DockStyle.Fill;
-        grpRaw.Location = new Point(3, 367);
+        grpRaw.Location = new Point(3, 347);
         grpRaw.Name = "grpRaw";
         grpRaw.Padding = new Padding(10);
-        grpRaw.Size = new Size(378, 134);
+        grpRaw.Size = new Size(378, 114);
         grpRaw.TabStop = false;
         grpRaw.Text = "原始文本";
         txtRaw.Dock = DockStyle.Fill;
@@ -554,10 +545,10 @@ public sealed partial class TextOcrTestForm
         txtRaw.ScrollBars = ScrollBars.Vertical;
         grpNormalized.Controls.Add(txtNormalized);
         grpNormalized.Dock = DockStyle.Fill;
-        grpNormalized.Location = new Point(3, 507);
+        grpNormalized.Location = new Point(3, 467);
         grpNormalized.Name = "grpNormalized";
         grpNormalized.Padding = new Padding(10);
-        grpNormalized.Size = new Size(378, 134);
+        grpNormalized.Size = new Size(378, 114);
         grpNormalized.TabStop = false;
         grpNormalized.Text = "归一化文本";
         txtNormalized.Dock = DockStyle.Fill;
@@ -566,23 +557,55 @@ public sealed partial class TextOcrTestForm
         txtNormalized.Name = "txtNormalized";
         txtNormalized.ReadOnly = true;
         txtNormalized.ScrollBars = ScrollBars.Vertical;
+        grpTableJson.Controls.Add(tableJsonLayout);
+        grpTableJson.Dock = DockStyle.Fill;
+        grpTableJson.Location = new Point(3, 587);
+        grpTableJson.Name = "grpTableJson";
+        grpTableJson.Padding = new Padding(10);
+        grpTableJson.Size = new Size(378, 174);
+        grpTableJson.TabStop = false;
+        grpTableJson.Text = "表格 JSON";
+        tableJsonLayout.ColumnCount = 1;
+        tableJsonLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        tableJsonLayout.Controls.Add(btnCopyTableJson, 0, 0);
+        tableJsonLayout.Controls.Add(txtTableJson, 0, 1);
+        tableJsonLayout.Dock = DockStyle.Fill;
+        tableJsonLayout.Location = new Point(10, 26);
+        tableJsonLayout.Name = "tableJsonLayout";
+        tableJsonLayout.RowCount = 2;
+        tableJsonLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        tableJsonLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        tableJsonLayout.Size = new Size(358, 138);
+        btnCopyTableJson.Dock = DockStyle.Right;
+        btnCopyTableJson.Location = new Point(238, 3);
+        btnCopyTableJson.Name = "btnCopyTableJson";
+        btnCopyTableJson.Size = new Size(117, 26);
+        btnCopyTableJson.Text = "复制表格 JSON";
+        btnCopyTableJson.UseVisualStyleBackColor = true;
+        btnCopyTableJson.Click += btnCopyTableJson_Click;
+        txtTableJson.Dock = DockStyle.Fill;
+        txtTableJson.Font = new Font("Consolas", 9F);
+        txtTableJson.Location = new Point(3, 35);
+        txtTableJson.Multiline = true;
+        txtTableJson.Name = "txtTableJson";
+        txtTableJson.ReadOnly = true;
+        txtTableJson.ScrollBars = ScrollBars.Both;
+        txtTableJson.Size = new Size(352, 100);
         lblLogSection.Dock = DockStyle.Fill;
         lblLogSection.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
-        lblLogSection.Location = new Point(3, 644);
+        lblLogSection.Location = new Point(3, 764);
         lblLogSection.Name = "lblLogSection";
         lblLogSection.Size = new Size(378, 26);
         lblLogSection.Text = "执行日志";
+        lblLogSection.TextAlign = ContentAlignment.MiddleLeft;
         txtLog.Dock = DockStyle.Fill;
         txtLog.Font = new Font("Consolas", 9F);
-        txtLog.Location = new Point(3, 673);
+        txtLog.Location = new Point(3, 793);
         txtLog.Multiline = true;
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
         txtLog.ScrollBars = ScrollBars.Vertical;
-        txtLog.Size = new Size(378, 214);
-        //
-        // form
-        //
+        txtLog.Size = new Size(378, 94);
         AutoScaleDimensions = new SizeF(7F, 17F);
         AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new Size(1600, 920);
@@ -612,6 +635,9 @@ public sealed partial class TextOcrTestForm
         grpRaw.PerformLayout();
         grpNormalized.ResumeLayout(false);
         grpNormalized.PerformLayout();
+        grpTableJson.ResumeLayout(false);
+        tableJsonLayout.ResumeLayout(false);
+        tableJsonLayout.PerformLayout();
         ResumeLayout(false);
     }
 }

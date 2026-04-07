@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Anjian.Automation\Anjian.Automation.csproj" />
+    <ProjectReference Include="..\Anjian.Pdf\Anjian.Pdf.csproj" />
   </ItemGroup>
 
   <ItemGroup>
