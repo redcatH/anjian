@@ -216,25 +216,27 @@ public sealed class PdfFirstPageFieldExtractor : IPdfFirstPageFieldExtractor
 
     private static PdfSpan? FindSpan(IReadOnlyList<PdfWordBox> words, string targetText)
     {
-        var normalizedTarget = NormalizeText(targetText);
+        var normalizedTarget = NormalizeForMatch(targetText);
         for (var start = 0; start < words.Count; start++)
         {
             var merged = string.Empty;
             for (var end = start; end < words.Count; end++)
             {
-                merged += NormalizeText(words[end].Text);
-                if (!normalizedTarget.StartsWith(merged, StringComparison.Ordinal) &&
-                    !merged.Contains(normalizedTarget, StringComparison.Ordinal))
+                merged += NormalizeForMatch(words[end].Text);
+                if (string.IsNullOrEmpty(merged))
                 {
-                    if (merged.Length > normalizedTarget.Length)
-                    {
-                        break;
-                    }
+                    continue;
                 }
 
-                if (merged.Contains(normalizedTarget, StringComparison.Ordinal))
+                if (string.Equals(merged, normalizedTarget, StringComparison.Ordinal))
                 {
                     return new PdfSpan(words[start].Left, words[end].Right);
+                }
+
+                if (!normalizedTarget.StartsWith(merged, StringComparison.Ordinal) ||
+                    merged.Length >= normalizedTarget.Length)
+                {
+                    break;
                 }
             }
         }
@@ -276,6 +278,11 @@ public sealed class PdfFirstPageFieldExtractor : IPdfFirstPageFieldExtractor
     private static string NormalizeText(string text)
     {
         return string.Concat(text.Where(static ch => !char.IsWhiteSpace(ch)));
+    }
+
+    private static string NormalizeForMatch(string text)
+    {
+        return NormalizeText(text).Trim(':', '：');
     }
 
     private static double GetCenterY(Word word)
